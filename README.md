@@ -4,6 +4,12 @@ Clean starter template for building a Viewer module UI with Angular and DHTMLX S
 
 This starter uses the open-source version of DHTMLX Suite (NPM package: `dhx-suite`).
 
+## UI Preview
+
+![Viewer UI Screenshot](docs/assets/screenshots/screenshots-01.png)
+
+*Preview v0.2.0 - Light Theme (Current Baseline)*
+
 This repository intentionally includes:
 - Angular app shell
 - DHTMLX Suite integration
