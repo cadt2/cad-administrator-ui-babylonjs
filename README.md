@@ -46,6 +46,21 @@ npm run build
 npm test
 ```
 
+### Testing Note (Expected Failure in Demo Mode)
+
+In this starter template, a failing test can be expected in demo mode.
+
+Why it happens:
+- The UI loads config from static JSON files using root-relative URLs like `/config/sidebar.data.json`, `/config/top-menu.data.json`, and `/config/viewer-layout.config.json`.
+- During unit tests (Vitest/JSDOM), those URLs are not always resolved as in a real browser runtime.
+- The authentication/permissions flow is also a demonstration setup (static checks), so test expectations around full runtime behavior are limited by design.
+
+Result:
+- You may see failing assertions or URL parsing/load errors during `npm test`.
+- This is expected for the current demo baseline.
+
+If you need stable CI tests, mock `fetch` and DHTMLX data loading for `/config/*` resources and isolate auth checks in dedicated unit tests.
+
 ## Starter scope
 
 Current template scope is focused on Viewer UI foundation:
