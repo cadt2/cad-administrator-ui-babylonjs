@@ -28,32 +28,14 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private layout?: Layout;
 
   ngAfterViewInit(): void {
-    this.layout = new Layout(this.layoutHost.nativeElement, {
-      type: 'line',
-      cols: [
-        {
-          id: 'model-browser',
-          width: 220,
-          header: 'MODEL BROWSER',
-          collapsable: true,
-          resizable: true
-        },
-        {
-          type: 'none',
-          rows: [
-            {
-              id: 'viewer-tools',
-              height: 55,
-              html: '<div style="height:100%;width:100%;display:flex;align-items:center;justify-content:center;">Viewer Tools</div>',
-            },
-            {
-              id: 'main-viewer-area',
-              html: '<div style="height:100%;width:100%;display:flex;align-items:center;justify-content:center;">Main Viewer Area</div>',
-            },
-          ]
-        },
-      ]
-    });
+    void this.initializeLayout();
+  }
+
+  private async initializeLayout(): Promise<void> {
+    // Simulated server config load: this layout payload can come from a DB-backed settings endpoint.
+    const response = await fetch('/config/viewer-layout.config.json');
+    const layoutConfig = (await response.json()) as ConstructorParameters<typeof Layout>[1];
+    this.layout = new Layout(this.layoutHost.nativeElement, layoutConfig);
   }
 
   ngOnDestroy(): void {

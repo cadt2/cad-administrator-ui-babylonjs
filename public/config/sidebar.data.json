@@ -1,0 +1,28 @@
+[
+  { "id": "toggle", "icon": "mdi mdi-backburger" },
+  {
+    "type": "customHTML",
+    "id": "user-profile",
+    "css": "user-info-item",
+    "html": "<div class='user-info-container'><img class='user-info-avatar' src='/imgs/HEADSHOTS-MINI.jpg' alt='Leo Gomez'/><div class='user-info-title'>Leo Gomez</div><div class='user-info-contact'>@cadt2</div></div>"
+  },
+  { "type": "separator" },
+  { "id": "env-3d-viewer", "value": "3D VIEWER", "icon": "mdi mdi-cube-outline" },
+  { "type": "spacer" },
+  {
+    "id": "notification",
+    "value": "Notification",
+    "count": 25,
+    "countColor": "primary",
+    "icon": "mdi mdi-bell"
+  },
+  {
+    "id": "settings",
+    "value": "Settings",
+    "icon": "mdi mdi-cog",
+    "items": [
+      { "id": "myAccount", "value": "My Account", "icon": "mdi mdi-account-settings" },
+      { "id": "general", "value": "General Configuration", "icon": "mdi mdi-tune" }
+    ]
+  }
+]

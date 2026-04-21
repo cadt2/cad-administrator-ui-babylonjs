@@ -39,59 +39,17 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.sidebar = new Sidebar(this.sidebarHost().nativeElement, {
-      width: 180, // ancho expandido preferido
-      minWidth: 56, // ancho colapsado (valor típico DHTMLX)
+      width: 180, // preferred expanded width
+      minWidth: 56, // preferred collapsed width
       css: 'dhx_widget--border_right',
-      data: [
-        { id: 'toggle', icon: 'mdi mdi-backburger' },
-        // User profile block immediately after toggle
-        {
-          type: 'customHTML',
-          id: 'userInfo',
-          css: 'user-info-item',
-          html:
-              "<div class='user-info-container'>" +
-              "<img class='user-info-avatar' src='/imgs/HEADSHOTS-MINI.jpg' alt='Leo Gomez'/>" +
-              "<div class='user-info-title'>Leo Gomez</div>" +
-              "<div class='user-info-contact'>@cadt2</div>" +
-              '</div>'
-        },
-        { type: 'separator' },
-        ...ENVIRONMENTS.map((environment) => ({
-          id: environment.id,
-          value: environment.label,
-          icon: environment.icon
-        })),
-        { type: 'spacer' },
-        {
-          id: 'notification',
-          value: 'Notification',
-          count: 25,
-          countColor: 'primary',
-          icon: 'mdi mdi-bell'
-        },
-        {
-          id: 'settings',
-          value: 'Settings',
-          icon: 'mdi mdi-cog',
-          items: [
-            {
-              id: 'myAccount',
-              value: 'My Account',
-              icon: 'mdi mdi-account-settings'
-            },
-            {
-              id: 'general',
-              value: 'General Configuration',
-              icon: 'mdi mdi-tune'
-            }
-          ]
-        }
-      ]
+      data: []
     });
 
-    this.sidebar.select(this.defaultEnvironmentId, true);
-    this.environmentChange.emit(this.defaultEnvironmentId);
+    // Simulated server config load: these values can come from a DB-backed settings endpoint.
+    this.sidebar.data.load('/config/sidebar.data.json').then(() => {
+      this.sidebar?.select(this.defaultEnvironmentId, true);
+      this.environmentChange.emit(this.defaultEnvironmentId);
+    });
 
     this.sidebar.events.on('click', (id) => {
       if (!this.sidebar) {

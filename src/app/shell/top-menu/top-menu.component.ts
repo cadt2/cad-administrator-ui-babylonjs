@@ -35,26 +35,11 @@ export class TopMenuComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.topMenu = new Toolbar(this.topMenuHost().nativeElement, {
-      data: [
-        { type: 'spacer' },
-        {
-          id: this.themeItemId,
-          type: 'selectButton',
-          icon: 'mdi mdi-theme-light-dark',
-          value: 'Light',
-          items: [
-            {
-              id: 'theme-light',
-              value: 'Light'
-            },
-            {
-              id: 'theme-dark',
-              value: 'Dark'
-            }
-          ]
-        }
-      ]
+      data: []
     });
+
+    // Simulated server config load: labels and controls can be delivered by a settings service.
+    this.topMenu.data.load('/config/top-menu.data.json');
 
     setTheme('light', document.body);
 

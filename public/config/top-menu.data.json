@@ -1,0 +1,18 @@
+[
+  {
+    "id": "top-label",
+    "type": "title",
+    "value": "DHTMLX Suite Angular Template"
+  },
+  { "type": "spacer" },
+  {
+    "id": "theme-select",
+    "type": "selectButton",
+    "icon": "mdi mdi-theme-light-dark",
+    "value": "Light",
+    "items": [
+      { "id": "theme-light", "value": "Light" },
+      { "id": "theme-dark", "value": "Dark" }
+    ]
+  }
+]

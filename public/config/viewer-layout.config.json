@@ -1,0 +1,26 @@
+{
+  "type": "line",
+  "cols": [
+    {
+      "id": "model-browser",
+      "width": 220,
+      "header": "MODEL BROWSER",
+      "collapsable": true,
+      "resizable": true
+    },
+    {
+      "type": "none",
+      "rows": [
+        {
+          "id": "viewer-tools",
+          "height": 55,
+          "html": "<div style='height:100%;width:100%;display:flex;align-items:center;justify-content:center;'>Viewer Tools</div>"
+        },
+        {
+          "id": "main-viewer-area",
+          "html": "<div style='height:100%;width:100%;display:flex;align-items:center;justify-content:center;'>Main Viewer Area</div>"
+        }
+      ]
+    }
+  ]
+}
