@@ -1,4 +1,4 @@
-export type EnvironmentId = 'env-3d-viewer' | 'env-pdm' | 'env-inventory';
+export type EnvironmentId = 'env-3d-viewer';
 
 export const DEFAULT_ENVIRONMENT: EnvironmentId = 'env-3d-viewer';
 

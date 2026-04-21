@@ -46,7 +46,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
             },
             {
               id: 'C3',
-              html: '<div style="height:100%;width:100%;display:flex;align-items:center;justify-content:center;">Panel 3 (Babylon Scene)</div>',
+              html: '<div style="height:100%;width:100%;display:flex;align-items:center;justify-content:center;">Main Viewer Area</div>',
             },
           ]
         },

@@ -5,16 +5,6 @@ export const ENVIRONMENTS: EnvironmentDefinition[] = [
     id: 'env-3d-viewer',
     label: '3D VIEWER',
     icon: 'mdi mdi-cube-outline'
-  },
-  {
-    id: 'env-pdm',
-    label: 'PDM',
-    icon: 'mdi mdi-source-branch'
-  },
-  {
-    id: 'env-inventory',
-    label: 'INVENTORY',
-    icon: 'mdi mdi-warehouse'
   }
 ];
 

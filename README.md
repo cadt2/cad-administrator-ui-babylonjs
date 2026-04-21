@@ -1,59 +1,50 @@
-# DhtmlxSuiteAngular
+# Angular + DHTMLX Suite Viewer Starter
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.7.
+Clean starter template for building a Viewer module UI with Angular and DHTMLX Suite.
 
-## Development server
+This starter uses the open-source version of DHTMLX Suite (NPM package: `dhx-suite`).
 
-To start a local development server, run:
+This repository intentionally includes:
+- Angular app shell
+- DHTMLX Suite integration
+- Viewer module baseline layout (3L-style structure)
 
-```bash
-ng serve
-```
+This repository intentionally does not include:
+- BabylonJS integration
+- Full PDM or Inventory module implementations
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Stack
 
-## Code scaffolding
+- Angular CLI 21.2.x
+- DHTMLX Suite 9.x
+- TypeScript 5.9.x
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+## Run locally
 
 ```bash
-ng build
+npm install
+npm start
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Open http://localhost:4200/
 
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+## Build
 
 ```bash
-ng test
+npm run build
 ```
 
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
+## Test
 
 ```bash
-ng e2e
+npm test
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## Starter scope
 
-## Additional Resources
+Current template scope is focused on Viewer UI foundation:
+- Left panel: Assembly Browser placeholder
+- Top strip: Viewer Tools placeholder
+- Main area: Viewer canvas placeholder
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+You can extend this baseline with your own business modules and rendering engine later.
