@@ -1,38 +1,40 @@
-# Angular + DHTMLX Suite Viewer Starter
+# DHTMLX Suite Angular Viewer Template + BabylonJS
 
-Clean starter template for building a Viewer module UI with Angular and DHTMLX Suite.
+Angular 21 template for CAD-style administration UI using DHTMLX Suite as the shell and BabylonJS as the 3D engine.
 
-This starter uses the open-source version of DHTMLX Suite (NPM package: `dhx-suite`).
+This repository is based on the template workflow and now includes a working Babylon viewer inside the DHTMLX layout main viewport.
 
-## UI Preview
+## Current Status
 
-![Viewer UI Screenshot](docs/assets/screenshots/screenshot-02.png)
+Implemented:
+- Angular shell and config-driven DHTMLX layout
+- BabylonJS scene integration inside `main-viewer-area`
+- GLB loading pipeline (`public/models/RDX.glb`)
+- Camera fit from reusable model bounds feature
+- Ground grid behavior (scaled from model bounds)
+- Reflection environment/material pass (reusable feature)
+- Layout resize stability fix for collapse/expand/resize
 
-*Preview v0.3.0 - Config-Driven UI Baseline*
-
-This repository intentionally includes:
-- Angular app shell
-- DHTMLX Suite integration
-- Viewer module baseline layout (3L-style structure)
-
-This repository intentionally does not include:
-- BabylonJS integration
-- Full PDM or Inventory module implementations
+Not implemented yet:
+- Full viewer interaction suite from vanilla demo (tree selection sync, isolate, advanced overlays)
+- Backend-driven runtime config endpoints (currently static JSON)
 
 ## Stack
 
 - Angular CLI 21.2.x
-- DHTMLX Suite 9.x
+- DHTMLX Suite 9.x (`dhx-suite`)
+- BabylonJS 9.x (`@babylonjs/core`, `@babylonjs/loaders`, `@babylonjs/materials`)
 - TypeScript 5.9.x
 
-## Run locally
+## Run Locally
 
 ```bash
 npm install
 npm start
 ```
 
-Open http://localhost:4200/
+Default URL is usually `http://localhost:4200/`.
+If the port is busy, Angular CLI will prompt for a different port.
 
 ## Build
 
@@ -40,85 +42,88 @@ Open http://localhost:4200/
 npm run build
 ```
 
+Note: production build currently fails because the default Angular bundle budget is exceeded after BabylonJS integration. This is expected at the current stage.
+
 ## Test
 
 ```bash
 npm test
 ```
 
-### Testing Note (Expected Failure in Demo Mode)
+Note: test runs may fail in this template while working with static/demo JSON auth flows. This is expected for the current static mode and does not block local viewer development.
 
-In this starter template, a failing test can be expected in demo mode.
+## Known Errors (Current Stage)
+
+### 1) Production build budget error
+
+Typical error:
+- `bundle initial exceeded maximum budget`
 
 Why it happens:
-- The UI loads config from static JSON files using root-relative URLs like `/config/sidebar.data.json`, `/config/top-menu.data.json`, and `/config/viewer-layout.config.json`.
-- During unit tests (Vitest/JSDOM), those URLs are not always resolved as in a real browser runtime.
-- The authentication/permissions flow is also a demonstration setup (static checks), so test expectations around full runtime behavior are limited by design.
+- Angular production build enforces size budgets from `angular.json`.
+- After adding BabylonJS packages (`@babylonjs/core`, loaders, materials), the initial bundle is bigger than the template's default budget limits.
+- This is not a runtime crash; it is a build-time budget guard.
 
-Result:
-- You may see failing assertions or URL parsing/load errors during `npm test`.
-- This is expected for the current demo baseline.
+Current impact:
+- `npm start` works for local development.
+- `npm run build` fails until budgets are adjusted or viewer code is split/lazy-loaded.
 
-If you need stable CI tests, mock `fetch` and DHTMLX data loading for `/config/*` resources and isolate auth checks in dedicated unit tests.
+### 2) Test errors with static config URLs
 
-## Starter scope
+Typical errors:
+- `Failed to parse URL from /config/viewer-layout.config.json`
+- `Failed to parse URL from /config/sidebar.data.json`
+- `Failed to parse URL from /config/top-menu.data.json`
 
-Current template scope is focused on Viewer UI foundation:
-- Left panel: Assembly Browser placeholder
-- Top strip: Viewer Tools placeholder
-- Main area: Viewer canvas placeholder
+Why it happens:
+- The app currently runs in static/demo mode and loads config/auth-related JSON from absolute browser-style paths under `/config/...`.
+- In Vitest/Node test environment, there is no real browser origin serving these files, so `fetch('/config/...')` becomes an invalid URL in that context.
+- DHTMLX data loading and viewer bootstrap depend on these JSON files during component initialization.
 
-You can extend this baseline with your own business modules and rendering engine later.
+Current impact:
+- Unit tests may fail in CI/local test runs unless fetch/config loading is mocked.
+- This behavior is expected in the current static template stage.
 
-## Non-Intrusive UI Architecture (Config-Driven)
+## Viewer Architecture
 
-One of the core design decisions in this template is to keep UI composition driven by configuration, not hardcoded component logic.
+Main viewer component:
+- `src/app/features/viewer/viewer.module.component.ts`
 
-Why this matters:
-- Once a UI/UX is approved, teams should be able to evolve labels, menu items, ordering, visibility, and feature toggles without rewriting components.
-- It reduces regression risk because structural changes happen in config payloads instead of view logic.
-- It supports localization and tenant-specific customization with minimal code changes.
-- It makes backend integration straightforward, because config can be served from settings endpoints or a DB-backed configuration service.
+Reusable viewer features:
+- `src/app/features/viewer/model-bounds.ts`
+	- Centralized world bounds calculation utility
+	- Reused for camera fit and grid sizing
+- `src/app/features/viewer/viewer-reflections.ts`
+	- Reflection environment initialization
+	- Reflection application on PBR/Standard materials
 
-Current implementation follows this pattern:
-- Sidebar items are loaded through DHTMLX data loading API from public config JSON.
-- Top menu items and top label are loaded through DHTMLX data loading API from public config JSON.
-- Viewer layout structure is loaded from external JSON and then passed into DHTMLX Layout initialization.
+### Why this split
 
-Current config files:
-- public/config/sidebar.data.json
-- public/config/top-menu.data.json
-- public/config/viewer-layout.config.json
+The goal is to keep viewer orchestration in the component and move reusable technical logic into isolated feature modules. This allows the same math/visual behaviors to be reused in future viewer actions without duplicating logic.
 
-### Practical benefits for product teams
+## DHTMLX + Babylon Resize Stability Fix
 
-- Non-intrusive evolution: add/remove entries without editing component templates.
-- Faster experimentation: A/B test labels and UI structure through config revisions.
-- Cleaner codebase: components focus on behavior and events, not static content definition.
-- Backend-ready contract: move from static JSON files to API responses with the same schema.
+When the model browser cell is collapsed/expanded or resized, the Babylon canvas can become visually distorted if the engine viewport is not resized at the right time.
 
-### Suggested backend progression
+Implemented fix:
+- DHTMLX layout event hooks: `afterCollapse`, `afterExpand`, `resize`, `afterResizeEnd`
+- `ResizeObserver` on the actual viewer container
+- Frame-scheduled viewport refresh (`engine.resize()` + `scene.render()`)
 
-1. Keep the existing JSON schema as the canonical UI contract.
-2. Expose endpoints such as /api/ui-config/sidebar, /api/ui-config/top-menu, and /api/ui-config/viewer-layout.
-3. Add environment/tenant/language selection on the backend.
-4. Version the config contract to support safe rollout and rollback.
+This combination fixes the visual issue during:
+- Collapse/expand of `model-browser`
+- Manual cell resize
+- Generic layout invalidation cycles
 
-This approach preserves the UI design system while enabling long-term scalability and maintainability.
+## Config-Driven Shell
 
-### User Permissions (Demonstration)
+UI shell remains config-driven via static JSON files:
+- `public/config/sidebar.data.json`
+- `public/config/top-menu.data.json`
+- `public/config/viewer-layout.config.json`
 
-This template includes a demonstration of how to implement user role-based permissions for the Sidebar, Top Menu, and Viewer Layout components. The permissions are defined in the JSON configuration files and checked in the components using the `AuthService`.
+This keeps the template backend-ready: static JSON can later be replaced by API responses with the same schema.
 
-#### How It Works
-1. **Permissions in JSON**: Each component's configuration file includes a `permissions` field that specifies the roles allowed to access it.
-2. **AuthService**: The `AuthService` provides a method `hasPermission()` to check if the current user has the required roles.
-3. **Component Logic**: Each component checks the permissions during initialization and logs a warning if the user does not have access.
+## Screenshot
 
-#### Example
-- Sidebar: Allowed roles are `admin` and `editor`.
-- Top Menu: Allowed roles are `admin` and `viewer`.
-- Viewer Layout: Allowed roles are `admin` and `viewer`.
-
-#### Static Mode
-By default, the template operates in static mode, and the permission checks are for demonstration purposes only. To enable dynamic role-based access, integrate the `AuthService` with a backend authentication system.
+![Viewer UI Screenshot](docs/assets/screenshots/screenshot-03.png)
