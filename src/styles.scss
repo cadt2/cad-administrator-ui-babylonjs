@@ -1,6 +1,23 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Override dhxicons font with local copy to prevent CDN fetch */
+@font-face {
+  font-family: "dhxicons";
+  src: url("/fonts/dxi/dhxicons.woff2") format("woff2"),
+       url("/fonts/dxi/dhxicons.woff") format("woff");
+  font-display: block;
+}
+
+/* Prevent browser font-swap intervention for MDI */
+@font-face {
+  font-family: "Material Design Icons";
+  src: url("@mdi/font/fonts/materialdesignicons-webfont.woff2?v=7.4.47") format("woff2");
+  font-display: block;
+}
+
 @import "dhx-suite/codebase/suite.min.css";
 @import "@mdi/font/css/materialdesignicons.min.css";
+@import "@fortawesome/fontawesome-free/css/all.min.css";
 
 html,
 body {
