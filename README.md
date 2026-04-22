@@ -126,4 +126,4 @@ This keeps the template backend-ready: static JSON can later be replaced by API 
 
 ## Screenshot
 
-![Viewer UI Screenshot](docs/assets/screenshots/screenshot-03.png)
+![Viewer UI Screenshot](docs/assets/screenshots/screenshot-04.png)
