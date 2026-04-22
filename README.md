@@ -4,6 +4,15 @@ Angular 21 template for CAD-style administration UI using DHTMLX Suite as the sh
 
 This repository is based on the template workflow and now includes a working Babylon viewer inside the DHTMLX layout main viewport.
 
+## Viewer Controls Quick Guide
+
+- Orbit: hold `Shift` + drag with the middle mouse button.
+- Pan: drag with the middle mouse button (without `Shift`).
+
+## Screenshot
+
+![Viewer UI Screenshot](docs/assets/screenshots/screenshot-04.png)
+
 ## Current Status
 
 Implemented:
@@ -124,6 +133,3 @@ UI shell remains config-driven via static JSON files:
 
 This keeps the template backend-ready: static JSON can later be replaced by API responses with the same schema.
 
-## Screenshot
-
-![Viewer UI Screenshot](docs/assets/screenshots/screenshot-04.png)
