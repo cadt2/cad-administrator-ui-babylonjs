@@ -260,6 +260,20 @@ function parseViewerControlsConfig(input: unknown): ViewerControlsConfig {
       color: #6b7280;
     }
 
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-assembly .dhx_tree-list-item__text,
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-assembly.dhx_tree-list-item .dhx_tree-list-item__text,
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-child .dhx_tree-list-item__text,
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-child.dhx_tree-list-item .dhx_tree-list-item__text {
+      color: #b8c0cc;
+    }
+
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-assembly .dhx_tree-list-item__icon,
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-assembly.dhx_tree-list-item .dhx_tree-list-item__icon,
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-child .dhx_tree-list-item__icon,
+    :host-context(body[data-dhx-theme='dark']) ::ng-deep .parts-tree .tree-node-child.dhx_tree-list-item .dhx_tree-list-item__icon {
+      color: #b8c0cc;
+    }
+
     :host ::ng-deep .parts-tree .dhx_tree-list-item__icon.fa-solid,
     :host ::ng-deep .parts-tree .dhx_tree-list-item__icon.fa-regular {
       width: 18px;
