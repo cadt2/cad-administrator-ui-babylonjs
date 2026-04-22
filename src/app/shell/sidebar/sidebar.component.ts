@@ -27,6 +27,18 @@ import { Inject } from '@angular/core';
     .sidebar-host {
       height: 100%;
     }
+
+    :host-context([data-dhx-theme='light']) ::ng-deep .shell-sidebar {
+      background-color: var(--dhx-background-secondary);
+    }
+
+    :host-context([data-dhx-theme='light']) ::ng-deep .shell-sidebar .dhx_sidebar-button--active {
+      background-color: hsl(var(--dhx-h-background), var(--dhx-s-background), calc(var(--dhx-l-background) - 7%));
+    }
+
+    :host-context([data-dhx-theme='light']) ::ng-deep .shell-sidebar .dhx_sidebar-button--active:hover {
+      background-color: hsl(var(--dhx-h-background), var(--dhx-s-background), calc(var(--dhx-l-background) - 12%));
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -45,7 +57,7 @@ export class SidebarComponent implements AfterViewInit, OnDestroy {
     this.sidebar = new Sidebar(this.sidebarHost().nativeElement, {
       width: 180, // preferred expanded width
       minWidth: 56, // preferred collapsed width
-      css: 'dhx_widget--border_right',
+      css: 'dhx_widget--border_right shell-sidebar',
       data: []
     });
 

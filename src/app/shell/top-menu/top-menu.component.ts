@@ -25,6 +25,10 @@ import { Inject } from '@angular/core';
       width: 100%;
       border-bottom: var(--dhx-border);
     }
+
+    :host-context([data-dhx-theme='light']) ::ng-deep .shell-top-toolbar {
+      background-color: var(--dhx-background-secondary);
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -47,6 +51,7 @@ export class TopMenuComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.topMenu = new Toolbar(this.topMenuHost().nativeElement, {
+      css: 'shell-top-toolbar',
       data: []
     });
 

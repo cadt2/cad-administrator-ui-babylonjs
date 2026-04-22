@@ -1,31 +1,31 @@
 {
   "type": "line",
-  "cols": [
+  "rows": [
     {
-      "id": "model-browser",
-      "width": 220,
-      "header": "MODEL BROWSER",
-      "collapsable": true,
-      "resizable": true
+      "id": "viewer-tools",
+      "height": 55,
+      "html": "<div style='height:100%;width:100%;display:flex;align-items:center;justify-content:center;'>Viewer Tools</div>"
     },
     {
       "type": "none",
-      "rows": [
+      "cols": [
         {
-          "id": "viewer-tools",
-          "height": 55,
-          "html": "<div style='height:100%;width:100%;display:flex;align-items:center;justify-content:center;'>Viewer Tools</div>"
+          "id": "model-browser",
+          "width": 320,
+          "header": "MODEL BROWSER",
+          "collapsable": true,
+          "resizable": true
         },
         {
           "id": "main-viewer-area",
           "html": "<div style='height:100%;width:100%;display:flex;align-items:center;justify-content:center;'>Main Viewer Area</div>"
-        },
-        {
-          "id": "command-action-reference",
-          "height": 55,
-          "html": "<div style='height:100%;width:100%;display:flex;align-items:center;justify-content:center;'>Command Action Reference</div>"
         }
       ]
+    },
+    {
+      "id": "command-action-reference",
+      "height": 55,
+      "html": "<div style='height:100%;width:100%;display:flex;align-items:center;justify-content:center;'>Command Action Reference</div>"
     }
   ]
 }

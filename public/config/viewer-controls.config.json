@@ -1,0 +1,6 @@
+{
+  "orbitSensitivity": 0.0025,
+  "orbitModifierKey": "shift",
+  "radiusSensitivityExponent": 0.3333333333,
+  "minRadiusForSensitivity": 0.0001
+}
