@@ -1,8 +1,15 @@
-import { ArcRotateCamera, Engine, Mesh, Scene, Vector3 } from '@babylonjs/core';
+import { ArcRotateCamera, Mesh, Scene, Vector3 } from '@babylonjs/core';
+
+export interface ViewerPointerEngine {
+  getRenderingCanvasClientRect: () => DOMRect | null;
+  getRenderingCanvas: () => HTMLCanvasElement | null;
+  getRenderWidth: () => number;
+  getRenderHeight: () => number;
+}
 
 export interface PanFeatureConfig {
   scene: Scene;
-  engine: Engine;
+  engine: ViewerPointerEngine;
   camera: ArcRotateCamera;
   ground: Mesh;
 }
@@ -17,7 +24,7 @@ interface PointerRenderCoordinates {
   y: number;
 }
 
-function getPointerRenderCoordinates(event: PointerEvent, engine: Engine): PointerRenderCoordinates {
+function getPointerRenderCoordinates(event: PointerEvent, engine: ViewerPointerEngine): PointerRenderCoordinates {
   const canvasRect =
     engine.getRenderingCanvasClientRect() ??
     engine.getRenderingCanvas()?.getBoundingClientRect() ?? {

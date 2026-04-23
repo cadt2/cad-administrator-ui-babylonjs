@@ -102,6 +102,11 @@ Reusable viewer features:
 - `src/app/features/viewer/model-bounds.ts`
 	- Centralized world bounds calculation utility
 	- Reused for camera fit and grid sizing
+- `src/app/features/viewer/viewer-scene.config.ts`
+	- Canonical scene configuration contract (engine, camera, grid, environment)
+	- Parsing, validation, and defaults for external scene config payloads
+- `src/app/features/viewer/viewer-interaction-controls.ts`
+	- Encapsulated pointer interaction orchestration (orbit + pan)
 - `src/app/features/viewer/viewer-reflections.ts`
 	- Reflection environment initialization
 	- Reflection application on PBR/Standard materials
@@ -109,6 +114,22 @@ Reusable viewer features:
 ### Why this split
 
 The goal is to keep viewer orchestration in the component and move reusable technical logic into isolated feature modules. This allows the same math/visual behaviors to be reused in future viewer actions without duplicating logic.
+
+## Viewer Scene Config Externalization
+
+What changed:
+- Scene and rendering configuration was extracted from `viewer.module.component.ts` into `src/app/features/viewer/viewer-scene.config.ts`.
+- The runtime payload source was added at `public/config/viewer-scene.config.json`.
+- Pointer interaction orchestration is now in `src/app/features/viewer/viewer-interaction-controls.ts`.
+
+Why this was done:
+- Keep the viewer component focused on orchestration, not hardcoded rendering constants.
+- Enable future runtime customization from external sources (UI/API/DB) without restructuring the viewer core.
+- Preserve current behavior while creating a stable, typed configuration contract for later extension (including future WebGPU selection workflows).
+
+Current behavior note:
+- No new viewer tools UI is introduced in this step.
+- The viewer still works with the same defaults, now loaded through the extracted scene config pipeline.
 
 ## DHTMLX + Babylon Resize Stability Fix
 

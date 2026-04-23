@@ -1,10 +1,10 @@
-import { ArcRotateCamera, Engine, Mesh, Scene, Vector3 } from '@babylonjs/core';
+import { ArcRotateCamera, Mesh, Scene, Vector3 } from '@babylonjs/core';
 import { createOrbitFeature, OrbitModifierKey } from './orbit-controls';
-import { createPanFeature } from './pan-controls';
+import { createPanFeature, type ViewerPointerEngine } from './pan-controls';
 
-export interface PanOrbitControlsConfig {
+export interface ViewerInteractionControlsConfig {
   scene: Scene;
-  engine: Engine;
+  engine: ViewerPointerEngine;
   canvas: HTMLCanvasElement;
   camera: ArcRotateCamera;
   ground: Mesh;
@@ -16,7 +16,7 @@ export interface PanOrbitControlsConfig {
   onInteraction?: () => void;
 }
 
-export interface PanOrbitControls {
+export interface ViewerInteractionControls {
   dispose: () => void;
 }
 
@@ -25,7 +25,7 @@ interface PointerRenderCoordinates {
   y: number;
 }
 
-export function attachPanOrbitControls(config: PanOrbitControlsConfig): PanOrbitControls {
+export function attachViewerInteractionControls(config: ViewerInteractionControlsConfig): ViewerInteractionControls {
   const {
     scene,
     engine,

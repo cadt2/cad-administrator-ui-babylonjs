@@ -1,24 +1,30 @@
 import {
   ArcRotateCamera,
   Color3,
-  Color4,
   Engine,
   HemisphericLight,
-  ImageProcessingConfiguration,
+  Mesh,
   MeshBuilder,
   Scene,
   SceneLoader,
   Vector3
 } from '@babylonjs/core';
+import { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
 import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials/grid/gridMaterial';
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Layout, Tree } from 'dhx-suite';
 import { computeModelBounds } from './model-bounds';
-import { attachPanOrbitControls, PanOrbitControls } from './pan-orbit-controls';
+import { attachViewerInteractionControls, ViewerInteractionControls } from './viewer-interaction-controls';
+import {
+  DEFAULT_VIEWER_SCENE_CONFIG,
+  parseViewerSceneConfig,
+  toColor4,
+  type ViewerRenderApi,
+  type ViewerSceneConfig
+} from './viewer-scene.config';
 import {
   applyEnvironmentReflectionsToMaterials,
-  DEFAULT_VIEWER_REFLECTION_CONFIG,
   initializeReflectionEnvironment
 } from './viewer-reflections';
 
@@ -174,10 +180,7 @@ const DEFAULT_VIEWER_CONTROLS_CONFIG: ViewerControlsConfig = {
   minRadiusForSensitivity: 0.0001
 };
 
-const VIEWER_SCENE_COLORS = {
-  dark: new Color4(0.145, 0.145, 0.145, 1),
-  light: new Color4(0.9, 0.96, 1, 1)
-};
+type ViewerEngine = Engine | WebGPUEngine;
 
 function isModifierKey(value: unknown): value is ViewerControlsConfig['orbitModifierKey'] {
   return value === 'shift' || value === 'ctrl' || value === 'alt' || value === 'meta';
@@ -297,20 +300,22 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private layout?: Layout;
   private modelBrowserTree?: Tree;
   private modelBrowserTreeData: ModelBrowserTreeNode[] = [];
-  private engine?: Engine;
+  private engine?: ViewerEngine;
   private scene?: Scene;
+  private camera?: ArcRotateCamera;
+  private ground?: Mesh;
+  private gridMaterial?: GridMaterial;
   private themeObserver?: MutationObserver;
   private resizeObserver?: ResizeObserver;
   private resizeRafId: number | null = null;
   private readonly onResize = () => this.engine?.resize();
   private readonly onLayoutInvalidated = () => this.refreshSceneViewport();
-  private panOrbitControls?: PanOrbitControls;
+  private viewerInteractionControls?: ViewerInteractionControls;
   private currentModelRadius = 1;
   private controlsConfig: ViewerControlsConfig = DEFAULT_VIEWER_CONTROLS_CONFIG;
+  private sceneConfig: ViewerSceneConfig = DEFAULT_VIEWER_SCENE_CONFIG;
   private isDestroyed = false;
   private viewerInitToken = 0;
-
-  private readonly reflectionConfig = DEFAULT_VIEWER_REFLECTION_CONFIG;
 
   ngAfterViewInit(): void {
     this.isDestroyed = false;
@@ -320,9 +325,10 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private async initializeLayout(): Promise<void> {
     const initToken = ++this.viewerInitToken;
 
-    const [layoutResponse, controlsResponse] = await Promise.allSettled([
+    const [layoutResponse, controlsResponse, sceneResponse] = await Promise.allSettled([
       fetch('/config/viewer-layout.config.json'),
-      fetch('/config/viewer-controls.config.json')
+      fetch('/config/viewer-controls.config.json'),
+      fetch('/config/viewer-scene.config.json')
     ]);
 
     if (this.isDestroyed || initToken !== this.viewerInitToken) {
@@ -337,6 +343,16 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       }
     } else {
       this.controlsConfig = DEFAULT_VIEWER_CONTROLS_CONFIG;
+    }
+
+    if (sceneResponse.status === 'fulfilled') {
+      try {
+        this.sceneConfig = parseViewerSceneConfig(await sceneResponse.value.json());
+      } catch {
+        this.sceneConfig = DEFAULT_VIEWER_SCENE_CONFIG;
+      }
+    } else {
+      this.sceneConfig = DEFAULT_VIEWER_SCENE_CONFIG;
     }
 
     if (layoutResponse.status !== 'fulfilled') {
@@ -422,7 +438,9 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     }
 
     const theme = this.getCurrentTheme();
-    this.scene.clearColor = theme === 'dark' ? VIEWER_SCENE_COLORS.dark : VIEWER_SCENE_COLORS.light;
+    this.scene.clearColor = theme === 'dark'
+      ? toColor4(this.sceneConfig.scene.clearColorDark)
+      : toColor4(this.sceneConfig.scene.clearColorLight);
     if (this.scene.activeCamera) {
       this.scene.render();
     }
@@ -473,7 +491,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private initializeBabylonScene(container: HTMLElement, initToken: number): void {
+  private async initializeBabylonScene(container: HTMLElement, initToken: number): Promise<void> {
     this.disposeViewerResources();
 
     container.innerHTML = '';
@@ -487,42 +505,61 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     canvas.style.touchAction = 'none';
     container.appendChild(canvas);
 
-    this.engine = new Engine(canvas, true, {
-      useHighPrecisionMatrix: true,
-      premultipliedAlpha: false,
-      preserveDrawingBuffer: false,
-      antialias: true
-    });
+    const engineResult = await this.createEngine(canvas);
+    if (this.isDestroyed || this.viewerInitToken !== initToken) {
+      engineResult.engine.dispose();
+      return;
+    }
+
+    this.engine = engineResult.engine;
     this.scene = new Scene(this.engine);
+    this.engine.setHardwareScalingLevel(this.sceneConfig.engine.hardwareScalingLevel);
     this.applySceneThemeColor();
     this.bindThemeObserver();
-    // Neutral KHR PBR tone mapping — same as sandbox default
-    this.scene.imageProcessingConfiguration.toneMappingEnabled = true;
-    this.scene.imageProcessingConfiguration.toneMappingType =
-      ImageProcessingConfiguration.TONEMAPPING_KHR_PBR_NEUTRAL;
+    this.scene.imageProcessingConfiguration.toneMappingEnabled = this.sceneConfig.scene.toneMappingEnabled;
+    this.scene.imageProcessingConfiguration.toneMappingType = this.sceneConfig.scene.toneMappingType;
     const scene = this.scene;
-    initializeReflectionEnvironment(scene, this.reflectionConfig);
+    initializeReflectionEnvironment(scene, this.sceneConfig.environment.reflections);
 
-    const camera = new ArcRotateCamera('mainCamera', Math.PI / 4, Math.PI / 3, 8, Vector3.Zero(), this.scene);
+    const camera = new ArcRotateCamera(
+      'mainCamera',
+      this.sceneConfig.camera.alpha,
+      this.sceneConfig.camera.beta,
+      this.sceneConfig.camera.initialRadius,
+      Vector3.Zero(),
+      this.scene
+    );
     camera.attachControl(canvas, true);
+    this.camera = camera;
 
     new HemisphericLight('mainLight', new Vector3(1, 1, 0), this.scene);
     // Fallback light — active only when the model has no lights and no env texture.
 
     const ground = MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, this.scene);
     ground.isPickable = false;
+    ground.isVisible = this.sceneConfig.grid.enabled && this.sceneConfig.ground.enabled;
+    this.ground = ground;
 
     const gridMaterial = new GridMaterial('gridMaterial', this.scene);
-    gridMaterial.majorUnitFrequency = 5;
-    gridMaterial.minorUnitVisibility = 0.45;
+    gridMaterial.majorUnitFrequency = this.sceneConfig.grid.majorUnitFrequency;
+    gridMaterial.minorUnitVisibility = this.sceneConfig.grid.minorUnitVisibility;
     gridMaterial.gridRatio = 1;
     gridMaterial.backFaceCulling = false;
-    gridMaterial.mainColor = new Color3(1, 1, 1);
-    gridMaterial.lineColor = new Color3(0.7, 0.7, 0.7);
-    gridMaterial.opacity = 0.85;
+    gridMaterial.mainColor = new Color3(
+      this.sceneConfig.grid.mainColor[0],
+      this.sceneConfig.grid.mainColor[1],
+      this.sceneConfig.grid.mainColor[2]
+    );
+    gridMaterial.lineColor = new Color3(
+      this.sceneConfig.grid.lineColor[0],
+      this.sceneConfig.grid.lineColor[1],
+      this.sceneConfig.grid.lineColor[2]
+    );
+    gridMaterial.opacity = this.sceneConfig.grid.opacity;
     ground.material = gridMaterial;
+    this.gridMaterial = gridMaterial;
 
-    this.panOrbitControls = attachPanOrbitControls({
+    this.viewerInteractionControls = attachViewerInteractionControls({
       scene,
       engine: this.engine,
       canvas,
@@ -536,14 +573,12 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       onInteraction: () => this.scene?.render()
     });
 
-    // On-demand rendering: only render when the scene is actually dirty (camera moved, model loaded, resize).
-    // Sandbox pattern: adjust camera feel based on current radius every frame.
     this.engine.runRenderLoop(() => {
       if (this.scene?.activeCamera) {
         const cam = this.scene.activeCamera as ArcRotateCamera;
         if (cam.radius) {
-          cam.panningSensibility = 5000 / cam.radius;
-          cam.speed = cam.radius * 0.2;
+          cam.panningSensibility = this.sceneConfig.camera.panningSensibilityFactor / cam.radius;
+          cam.speed = cam.radius * this.sceneConfig.camera.speedFactor;
         }
         this.scene.render();
       }
@@ -573,25 +608,32 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
         return;
       }
 
-      applyEnvironmentReflectionsToMaterials(scene, renderableMeshes, this.reflectionConfig);
+      applyEnvironmentReflectionsToMaterials(scene, renderableMeshes, this.sceneConfig.environment.reflections);
 
-  // Sandbox camera framing pattern
-  camera.setTarget(bounds.center);
-  this.currentModelRadius = bounds.radius;
-  camera.lowerRadiusLimit = Math.max(bounds.radius * 0.01, 0.01);
-  camera.upperRadiusLimit = bounds.radius * 5;
-  camera.radius = Math.max(bounds.radius * 2.2, camera.lowerRadiusLimit + 0.1);
-  camera.minZ = Math.max(bounds.radius * 0.001, 0.001);
-  camera.maxZ = bounds.radius * 1000;
-  camera.wheelDeltaPercentage = 0.01;
-  camera.pinchDeltaPercentage = 0.01;
+      camera.setTarget(bounds.center);
+      this.currentModelRadius = bounds.radius;
+      camera.lowerRadiusLimit = Math.max(bounds.radius * this.sceneConfig.camera.lowerRadiusFactor, 0.01);
+      camera.upperRadiusLimit = bounds.radius * this.sceneConfig.camera.upperRadiusFactor;
+      camera.radius = Math.max(bounds.radius * 2.2, camera.lowerRadiusLimit + 0.1);
+      camera.minZ = Math.max(bounds.radius * this.sceneConfig.camera.minZFactor, 0.001);
+      camera.maxZ = bounds.radius * this.sceneConfig.camera.maxZFactor;
+      camera.wheelDeltaPercentage = this.sceneConfig.camera.wheelDeltaPercentage;
+      camera.pinchDeltaPercentage = this.sceneConfig.camera.pinchDeltaPercentage;
 
-  // Sandbox: skip CPU frustum clipping — GPU handles culling on complex models
-  scene.skipFrustumClipping = true;
+      scene.skipFrustumClipping = this.sceneConfig.performance.skipFrustumClipping;
 
-      const groundSize = Math.max(bounds.diagonal * 2, 20);
-      const gridRatio = Math.max(bounds.diagonal / 40, 0.02);
-      const groundOffset = Math.max(bounds.radius * 0.01, 0.001);
+      const groundSize = Math.max(
+        bounds.diagonal * this.sceneConfig.ground.sizeFromBoundsMultiplier,
+        this.sceneConfig.ground.minSize
+      );
+      const gridRatio = Math.max(
+        bounds.diagonal / this.sceneConfig.grid.gridRatioFromBoundsDivisor,
+        this.sceneConfig.grid.minGridRatio
+      );
+      const groundOffset = Math.max(
+        bounds.radius * this.sceneConfig.ground.offsetFromRadiusFactor,
+        this.sceneConfig.ground.minOffset
+      );
 
       ground.position.x = bounds.center.x;
       ground.position.z = bounds.center.z;
@@ -600,9 +642,35 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       ground.scaling.z = groundSize / 20;
 
       gridMaterial.gridRatio = gridRatio;
-      gridMaterial.majorUnitFrequency = 5;
-      gridMaterial.minorUnitVisibility = 0.35;
+      gridMaterial.majorUnitFrequency = this.sceneConfig.grid.majorUnitFrequency;
+      gridMaterial.minorUnitVisibility = this.sceneConfig.grid.minorUnitVisibility;
+      ground.isVisible = this.sceneConfig.grid.enabled && this.sceneConfig.ground.enabled;
+      scene.environmentIntensity = this.sceneConfig.environment.reflections.sceneEnvironmentIntensity;
     });
+  }
+
+  private async createEngine(canvas: HTMLCanvasElement): Promise<{ engine: ViewerEngine; activeApi: ViewerRenderApi }> {
+    const options = {
+      antialias: this.sceneConfig.engine.antialias,
+      premultipliedAlpha: this.sceneConfig.engine.premultipliedAlpha,
+      preserveDrawingBuffer: this.sceneConfig.engine.preserveDrawingBuffer,
+      useHighPrecisionMatrix: this.sceneConfig.engine.useHighPrecisionMatrix,
+      adaptToDeviceRatio: this.sceneConfig.engine.adaptToDeviceRatio,
+      powerPreference: this.sceneConfig.engine.powerPreference
+    };
+
+    if (this.sceneConfig.engine.preferredApi === 'webgpu') {
+      const webGpuSupported = await WebGPUEngine.IsSupportedAsync;
+      if (webGpuSupported) {
+        const webGpuEngine = new WebGPUEngine(canvas, options);
+        await webGpuEngine.initAsync();
+        return { engine: webGpuEngine, activeApi: 'webgpu' };
+      }
+      console.warn('WebGPU is not supported in this browser/context. Falling back to WebGL.');
+    }
+
+    const webGlEngine = new Engine(canvas, true, options);
+    return { engine: webGlEngine, activeApi: 'webgl' };
   }
 
   private bindContainerResizeObserver(container: HTMLElement): void {
@@ -628,8 +696,11 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       this.resizeRafId = null;
     }
 
-    this.panOrbitControls?.dispose();
-    this.panOrbitControls = undefined;
+    this.viewerInteractionControls?.dispose();
+    this.viewerInteractionControls = undefined;
+    this.camera = undefined;
+    this.ground = undefined;
+    this.gridMaterial = undefined;
 
     this.engine?.stopRenderLoop();
     this.scene?.dispose();

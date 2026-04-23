@@ -1,0 +1,67 @@
+{
+  "ui": {
+    "showViewerTools": true
+  },
+  "engine": {
+    "preferredApi": "webgl",
+    "allowRuntimeApiSwitch": true,
+    "antialias": true,
+    "useHighPrecisionMatrix": true,
+    "premultipliedAlpha": false,
+    "preserveDrawingBuffer": false,
+    "adaptToDeviceRatio": true,
+    "hardwareScalingLevel": 1,
+    "powerPreference": "high-performance"
+  },
+  "scene": {
+    "clearColorDark": [0.145, 0.145, 0.145, 1],
+    "clearColorLight": [0.9, 0.96, 1, 1],
+    "toneMappingEnabled": true,
+    "toneMappingType": 1
+  },
+  "performance": {
+    "skipFrustumClipping": true
+  },
+  "camera": {
+    "alpha": 0.7853981633974483,
+    "beta": 1.0471975511965976,
+    "initialRadius": 8,
+    "lowerRadiusFactor": 0.01,
+    "upperRadiusFactor": 5,
+    "minZFactor": 0.001,
+    "maxZFactor": 1000,
+    "wheelDeltaPercentage": 0.01,
+    "pinchDeltaPercentage": 0.01,
+    "panningSensibilityFactor": 5000,
+    "speedFactor": 0.2
+  },
+  "ground": {
+    "enabled": true,
+    "minSize": 20,
+    "sizeFromBoundsMultiplier": 2,
+    "offsetFromRadiusFactor": 0.01,
+    "minOffset": 0.001
+  },
+  "grid": {
+    "enabled": true,
+    "majorUnitFrequency": 5,
+    "minorUnitVisibility": 0.45,
+    "gridRatioFromBoundsDivisor": 40,
+    "minGridRatio": 0.02,
+    "opacity": 0.85,
+    "mainColor": [1, 1, 1],
+    "lineColor": [0.7, 0.7, 0.7]
+  },
+  "environment": {
+    "reflections": {
+      "enabled": true,
+      "environmentTextureUrl": "https://assets.babylonjs.com/environments/environmentSpecular.env",
+      "sceneEnvironmentIntensity": 1,
+      "materialEnvironmentIntensity": 1,
+      "applyToStandardMaterial": true,
+      "standardReflectionLevel": 0.35,
+      "exposure": 1,
+      "contrast": 1
+    }
+  }
+}
