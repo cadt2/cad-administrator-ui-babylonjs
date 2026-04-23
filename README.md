@@ -102,6 +102,12 @@ Reusable viewer features:
 - `src/app/features/viewer/model-bounds.ts`
 	- Centralized world bounds calculation utility
 	- Reused for camera fit and grid sizing
+- `src/app/features/viewer/viewer-scene-bootstrap.ts`
+	- Base Babylon bootstrap (engine creation, scene, camera, light, ground, grid)
+	- Keeps `viewer.module.component.ts` focused on orchestration
+- `src/app/features/viewer/viewer-model-loader.ts`
+	- Model import and framing workflow (bounds, camera fit, ground/grid updates)
+	- Designed for future UI/API-triggered model loading
 - `src/app/features/viewer/viewer-scene.config.ts`
 	- Canonical scene configuration contract (engine, camera, grid, environment)
 	- Parsing, validation, and defaults for external scene config payloads
@@ -130,6 +136,18 @@ Why this was done:
 Current behavior note:
 - No new viewer tools UI is introduced in this step.
 - The viewer still works with the same defaults, now loaded through the extracted scene config pipeline.
+
+## Viewer Orchestration Refactor (Phase 1 + Phase 2)
+
+What changed:
+- Base scene bootstrap was extracted into `src/app/features/viewer/viewer-scene-bootstrap.ts`.
+- Model loading and framing workflow was extracted into `src/app/features/viewer/viewer-model-loader.ts`.
+- `viewer.module.component.ts` now orchestrates these modules instead of implementing all Babylon details inline.
+
+Why this was done:
+- Reduce cognitive load in the main viewer component for demo and onboarding purposes.
+- Keep the current demo behavior unchanged (model still auto-loads).
+- Prepare a clean path to future on-demand model loading via UI/API without reworking core scene logic.
 
 ## DHTMLX + Babylon Resize Stability Fix
 

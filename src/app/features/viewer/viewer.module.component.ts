@@ -1,32 +1,28 @@
 import {
   ArcRotateCamera,
-  Color3,
-  Engine,
-  HemisphericLight,
   Mesh,
-  MeshBuilder,
-  Scene,
-  SceneLoader,
-  Vector3
+  Scene
 } from '@babylonjs/core';
-import { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
 import '@babylonjs/loaders/glTF';
 import { GridMaterial } from '@babylonjs/materials/grid/gridMaterial';
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Layout, Tree } from 'dhx-suite';
-import { computeModelBounds } from './model-bounds';
 import { attachViewerInteractionControls, ViewerInteractionControls } from './viewer-interaction-controls';
+import {
+  loadViewerModel,
+  type RenderableMeshLike
+} from './viewer-model-loader';
+import {
+  createViewerBaseScene,
+  createViewerEngine,
+  type ViewerEngine
+} from './viewer-scene-bootstrap';
 import {
   DEFAULT_VIEWER_SCENE_CONFIG,
   parseViewerSceneConfig,
   toColor4,
-  type ViewerRenderApi,
   type ViewerSceneConfig
 } from './viewer-scene.config';
-import {
-  applyEnvironmentReflectionsToMaterials,
-  initializeReflectionEnvironment
-} from './viewer-reflections';
 
 // ─── Model Browser Tree ────────────────────────────────────────────────────
 
@@ -179,8 +175,6 @@ const DEFAULT_VIEWER_CONTROLS_CONFIG: ViewerControlsConfig = {
   radiusSensitivityExponent: 1 / 3,
   minRadiusForSensitivity: 0.0001
 };
-
-type ViewerEngine = Engine | WebGPUEngine;
 
 function isModifierKey(value: unknown): value is ViewerControlsConfig['orbitModifierKey'] {
   return value === 'shift' || value === 'ctrl' || value === 'alt' || value === 'meta';
@@ -505,59 +499,26 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     canvas.style.touchAction = 'none';
     container.appendChild(canvas);
 
-    const engineResult = await this.createEngine(canvas);
+    const engineResult = await createViewerEngine(canvas, this.sceneConfig);
     if (this.isDestroyed || this.viewerInitToken !== initToken) {
       engineResult.engine.dispose();
       return;
     }
 
     this.engine = engineResult.engine;
-    this.scene = new Scene(this.engine);
-    this.engine.setHardwareScalingLevel(this.sceneConfig.engine.hardwareScalingLevel);
+    const baseScene = createViewerBaseScene(this.engine, canvas, this.sceneConfig);
+    this.scene = baseScene.scene;
+    this.camera = baseScene.camera;
+    this.ground = baseScene.ground;
+    this.gridMaterial = baseScene.gridMaterial;
+
     this.applySceneThemeColor();
     this.bindThemeObserver();
-    this.scene.imageProcessingConfiguration.toneMappingEnabled = this.sceneConfig.scene.toneMappingEnabled;
-    this.scene.imageProcessingConfiguration.toneMappingType = this.sceneConfig.scene.toneMappingType;
+
     const scene = this.scene;
-    initializeReflectionEnvironment(scene, this.sceneConfig.environment.reflections);
-
-    const camera = new ArcRotateCamera(
-      'mainCamera',
-      this.sceneConfig.camera.alpha,
-      this.sceneConfig.camera.beta,
-      this.sceneConfig.camera.initialRadius,
-      Vector3.Zero(),
-      this.scene
-    );
-    camera.attachControl(canvas, true);
-    this.camera = camera;
-
-    new HemisphericLight('mainLight', new Vector3(1, 1, 0), this.scene);
-    // Fallback light — active only when the model has no lights and no env texture.
-
-    const ground = MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, this.scene);
-    ground.isPickable = false;
-    ground.isVisible = this.sceneConfig.grid.enabled && this.sceneConfig.ground.enabled;
-    this.ground = ground;
-
-    const gridMaterial = new GridMaterial('gridMaterial', this.scene);
-    gridMaterial.majorUnitFrequency = this.sceneConfig.grid.majorUnitFrequency;
-    gridMaterial.minorUnitVisibility = this.sceneConfig.grid.minorUnitVisibility;
-    gridMaterial.gridRatio = 1;
-    gridMaterial.backFaceCulling = false;
-    gridMaterial.mainColor = new Color3(
-      this.sceneConfig.grid.mainColor[0],
-      this.sceneConfig.grid.mainColor[1],
-      this.sceneConfig.grid.mainColor[2]
-    );
-    gridMaterial.lineColor = new Color3(
-      this.sceneConfig.grid.lineColor[0],
-      this.sceneConfig.grid.lineColor[1],
-      this.sceneConfig.grid.lineColor[2]
-    );
-    gridMaterial.opacity = this.sceneConfig.grid.opacity;
-    ground.material = gridMaterial;
-    this.gridMaterial = gridMaterial;
+    const camera = baseScene.camera;
+    const ground = baseScene.ground;
+    const gridMaterial = baseScene.gridMaterial;
 
     this.viewerInteractionControls = attachViewerInteractionControls({
       scene,
@@ -588,89 +549,24 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     this.bindContainerResizeObserver(container);
 
     const modelFileName = 'RDX.glb';
-    const assemblyName = modelFileName.replace(/\.[^/.]+$/, '') || 'assembly';
 
-    SceneLoader.ImportMesh('', '/models/', modelFileName, scene, meshes => {
-      if (this.isDestroyed || this.viewerInitToken !== initToken || scene !== this.scene) {
-        return;
+    loadViewerModel({
+      scene,
+      camera,
+      ground,
+      gridMaterial,
+      sceneConfig: this.sceneConfig,
+      modelRootUrl: '/models/',
+      modelFileName,
+      shouldAbort: () => this.isDestroyed || this.viewerInitToken !== initToken || scene !== this.scene,
+      onModelLoaded: (event: { assemblyName: string; renderableMeshes: RenderableMeshLike[] }) => {
+        this.modelBrowserTreeData = buildModelBrowserTreeData(scene, event.assemblyName);
+        this.refreshModelBrowserTree();
+      },
+      onModelRadiusUpdated: (radius: number) => {
+        this.currentModelRadius = radius;
       }
-
-      const renderableMeshes = meshes.filter(
-        mesh => typeof mesh.getTotalVertices === 'function' && mesh.getTotalVertices() > 0
-      );
-
-      this.modelBrowserTreeData = buildModelBrowserTreeData(scene, assemblyName);
-      this.refreshModelBrowserTree();
-
-      const bounds = computeModelBounds(renderableMeshes, { refreshBounds: true });
-      if (!bounds) {
-        console.warn('No valid renderable bounds found for model');
-        return;
-      }
-
-      applyEnvironmentReflectionsToMaterials(scene, renderableMeshes, this.sceneConfig.environment.reflections);
-
-      camera.setTarget(bounds.center);
-      this.currentModelRadius = bounds.radius;
-      camera.lowerRadiusLimit = Math.max(bounds.radius * this.sceneConfig.camera.lowerRadiusFactor, 0.01);
-      camera.upperRadiusLimit = bounds.radius * this.sceneConfig.camera.upperRadiusFactor;
-      camera.radius = Math.max(bounds.radius * 2.2, camera.lowerRadiusLimit + 0.1);
-      camera.minZ = Math.max(bounds.radius * this.sceneConfig.camera.minZFactor, 0.001);
-      camera.maxZ = bounds.radius * this.sceneConfig.camera.maxZFactor;
-      camera.wheelDeltaPercentage = this.sceneConfig.camera.wheelDeltaPercentage;
-      camera.pinchDeltaPercentage = this.sceneConfig.camera.pinchDeltaPercentage;
-
-      scene.skipFrustumClipping = this.sceneConfig.performance.skipFrustumClipping;
-
-      const groundSize = Math.max(
-        bounds.diagonal * this.sceneConfig.ground.sizeFromBoundsMultiplier,
-        this.sceneConfig.ground.minSize
-      );
-      const gridRatio = Math.max(
-        bounds.diagonal / this.sceneConfig.grid.gridRatioFromBoundsDivisor,
-        this.sceneConfig.grid.minGridRatio
-      );
-      const groundOffset = Math.max(
-        bounds.radius * this.sceneConfig.ground.offsetFromRadiusFactor,
-        this.sceneConfig.ground.minOffset
-      );
-
-      ground.position.x = bounds.center.x;
-      ground.position.z = bounds.center.z;
-      ground.position.y = bounds.min.y - groundOffset;
-      ground.scaling.x = groundSize / 20;
-      ground.scaling.z = groundSize / 20;
-
-      gridMaterial.gridRatio = gridRatio;
-      gridMaterial.majorUnitFrequency = this.sceneConfig.grid.majorUnitFrequency;
-      gridMaterial.minorUnitVisibility = this.sceneConfig.grid.minorUnitVisibility;
-      ground.isVisible = this.sceneConfig.grid.enabled && this.sceneConfig.ground.enabled;
-      scene.environmentIntensity = this.sceneConfig.environment.reflections.sceneEnvironmentIntensity;
     });
-  }
-
-  private async createEngine(canvas: HTMLCanvasElement): Promise<{ engine: ViewerEngine; activeApi: ViewerRenderApi }> {
-    const options = {
-      antialias: this.sceneConfig.engine.antialias,
-      premultipliedAlpha: this.sceneConfig.engine.premultipliedAlpha,
-      preserveDrawingBuffer: this.sceneConfig.engine.preserveDrawingBuffer,
-      useHighPrecisionMatrix: this.sceneConfig.engine.useHighPrecisionMatrix,
-      adaptToDeviceRatio: this.sceneConfig.engine.adaptToDeviceRatio,
-      powerPreference: this.sceneConfig.engine.powerPreference
-    };
-
-    if (this.sceneConfig.engine.preferredApi === 'webgpu') {
-      const webGpuSupported = await WebGPUEngine.IsSupportedAsync;
-      if (webGpuSupported) {
-        const webGpuEngine = new WebGPUEngine(canvas, options);
-        await webGpuEngine.initAsync();
-        return { engine: webGpuEngine, activeApi: 'webgpu' };
-      }
-      console.warn('WebGPU is not supported in this browser/context. Falling back to WebGL.');
-    }
-
-    const webGlEngine = new Engine(canvas, true, options);
-    return { engine: webGlEngine, activeApi: 'webgl' };
   }
 
   private bindContainerResizeObserver(container: HTMLElement): void {
