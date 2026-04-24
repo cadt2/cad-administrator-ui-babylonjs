@@ -1,8 +1,24 @@
-# DHTMLX Suite Angular Viewer Template + BabylonJS
+# CAD Administrator UI (DHTMLX + BabylonJS)
 
-Angular 21 template for CAD-style administration UI using DHTMLX Suite as the shell and BabylonJS as the 3D engine.
+Angular 21 product for CAD administration and engineering review, built with web technologies using DHTMLX Suite as the application shell and BabylonJS as the 3D engine.
 
-This repository is based on the template workflow and now includes a working Babylon viewer inside the DHTMLX layout main viewport.
+The project is a strict CAD product delivered on a modern web stack: an engineering workspace with interactive 3D visualization, model-structure navigation, and domain-oriented workflows for technical stakeholders. The roadmap extends this core product with broader PLM/PDM and inventory capabilities without changing its CAD-first identity.
+
+## Product Direction
+
+- Deliver a CAD product on web technologies without depending on native desktop tooling
+- Provide 3D visualization for engineering review, inspection, and technical decision-making
+- Expose model structure as a first-class CAD workflow surface
+- Keep runtime layout and viewer behavior driven by external configuration
+- Extend the CAD core with PLM/PDM-style metadata and inventory capabilities over time
+
+## Engineering Use Cases (Target Scope)
+
+- Interactive 3D model review in a CAD-focused web product
+- Assembly and part structure navigation from the loaded model
+- Configurable engineering workspace for CAD-related modules and workflows
+- Foundation for future metadata validation, release-readiness checks, and inventory attributes
+- Lightweight viewer experience for manufacturing, quality, and sourcing stakeholders
 
 ## Viewer Controls Quick Guide
 
@@ -19,13 +35,18 @@ Implemented:
 - Angular shell and config-driven DHTMLX layout
 - BabylonJS scene integration inside `main-viewer-area`
 - GLB loading pipeline (`public/models/RDX.glb`)
+- Model browser tree generated from the loaded Babylon scene graph
 - Camera fit from reusable model bounds feature
 - Ground grid behavior (scaled from model bounds)
 - Reflection environment/material pass (reusable feature)
 - Layout resize stability fix for collapse/expand/resize
+- Viewer scene configuration externalized (`public/config/viewer-scene.config.json`)
 
-Not implemented yet:
-- Full viewer interaction suite from vanilla demo (tree selection sync, isolate, advanced overlays)
+Not implemented yet (planned):
+- Tree-to-viewer selection sync and richer viewer actions
+- PLM/PDM-style metadata panel (part number, revision, lifecycle status)
+- Inventory attributes panel (availability, supplier refs, stocking notes)
+- Advanced viewer tooling (isolate, overlays, richer inspection actions)
 - Backend-driven runtime config endpoints (currently static JSON)
 
 ## Stack
