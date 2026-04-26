@@ -13,6 +13,10 @@ import {
   type RenderableMeshLike
 } from './viewer-model-loader';
 import {
+  createViewerSceneSelectionFeature,
+  type ViewerSceneSelectionFeature
+} from './viewer-scene-selection';
+import {
   createViewerBaseScene,
   createViewerEngine,
   type ViewerEngine
@@ -305,6 +309,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private readonly onResize = () => this.engine?.resize();
   private readonly onLayoutInvalidated = () => this.refreshSceneViewport();
   private viewerInteractionControls?: ViewerInteractionControls;
+  private viewerSceneSelection?: ViewerSceneSelectionFeature;
   private currentModelRadius = 1;
   private controlsConfig: ViewerControlsConfig = DEFAULT_VIEWER_CONTROLS_CONFIG;
   private sceneConfig: ViewerSceneConfig = DEFAULT_VIEWER_SCENE_CONFIG;
@@ -534,6 +539,16 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       onInteraction: () => this.scene?.render()
     });
 
+    this.viewerSceneSelection = createViewerSceneSelectionFeature({
+      scene,
+      ground,
+      selectionColors: {
+        overlayColor: this.sceneConfig.selection.overlayColor,
+        outlineColor: this.sceneConfig.selection.outlineColor
+      },
+      onSelectionRendered: () => this.scene?.render()
+    });
+
     this.engine.runRenderLoop(() => {
       if (this.scene?.activeCamera) {
         const cam = this.scene.activeCamera as ArcRotateCamera;
@@ -562,6 +577,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       onModelLoaded: (event: { assemblyName: string; renderableMeshes: RenderableMeshLike[] }) => {
         this.modelBrowserTreeData = buildModelBrowserTreeData(scene, event.assemblyName);
         this.refreshModelBrowserTree();
+        this.viewerSceneSelection?.rebuildSelectableNodes();
       },
       onModelRadiusUpdated: (radius: number) => {
         this.currentModelRadius = radius;
@@ -594,6 +610,8 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
 
     this.viewerInteractionControls?.dispose();
     this.viewerInteractionControls = undefined;
+    this.viewerSceneSelection?.dispose();
+    this.viewerSceneSelection = undefined;
     this.camera = undefined;
     this.ground = undefined;
     this.gridMaterial = undefined;

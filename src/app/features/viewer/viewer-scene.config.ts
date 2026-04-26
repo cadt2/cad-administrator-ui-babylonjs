@@ -62,6 +62,10 @@ export interface ViewerSceneConfig {
     mainColor: RgbTuple;
     lineColor: RgbTuple;
   };
+  selection: {
+    overlayColor: RgbTuple;
+    outlineColor: RgbTuple;
+  };
   environment: {
     reflections: ViewerReflectionConfig;
   };
@@ -120,6 +124,10 @@ export const DEFAULT_VIEWER_SCENE_CONFIG: ViewerSceneConfig = {
     opacity: 0.85,
     mainColor: [1, 1, 1],
     lineColor: [0.7, 0.7, 0.7]
+  },
+  selection: {
+    overlayColor: [0.31, 0.86, 0.45],
+    outlineColor: [1, 0.5, 0]
   },
   environment: {
     reflections: DEFAULT_VIEWER_REFLECTION_CONFIG
@@ -234,6 +242,7 @@ export function parseViewerSceneConfig(input: unknown): ViewerSceneConfig {
   const rawCamera = (raw['camera'] as Record<string, unknown> | undefined) ?? {};
   const rawGround = (raw['ground'] as Record<string, unknown> | undefined) ?? {};
   const rawGrid = (raw['grid'] as Record<string, unknown> | undefined) ?? {};
+  const rawSelection = (raw['selection'] as Record<string, unknown> | undefined) ?? {};
   const rawEnvironment = (raw['environment'] as Record<string, unknown> | undefined) ?? {};
   const rawReflections = (rawEnvironment['reflections'] as Record<string, unknown> | undefined) ?? {};
 
@@ -290,6 +299,10 @@ export function parseViewerSceneConfig(input: unknown): ViewerSceneConfig {
       opacity: clamp(parseNumber(rawGrid['opacity'], defaults.grid.opacity), 0, 1),
       mainColor: parseRgbTuple(rawGrid['mainColor'], defaults.grid.mainColor),
       lineColor: parseRgbTuple(rawGrid['lineColor'], defaults.grid.lineColor)
+    },
+    selection: {
+      overlayColor: parseRgbTuple(rawSelection['overlayColor'], defaults.selection.overlayColor),
+      outlineColor: parseRgbTuple(rawSelection['outlineColor'], defaults.selection.outlineColor)
     },
     environment: {
       reflections: parseReflectionConfig(rawReflections)

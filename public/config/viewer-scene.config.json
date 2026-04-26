@@ -52,6 +52,10 @@
     "mainColor": [1, 1, 1],
     "lineColor": [0.7, 0.7, 0.7]
   },
+  "selection": {
+    "overlayColor": [0.31, 0.86, 0.45],
+    "outlineColor": [0, 1, 0]
+  },
   "environment": {
     "reflections": {
       "enabled": true,

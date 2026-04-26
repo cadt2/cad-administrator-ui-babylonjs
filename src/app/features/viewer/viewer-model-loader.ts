@@ -132,6 +132,7 @@ export function loadViewerModel(options: ViewerModelLoadOptions): void {
     gridMaterial.majorUnitFrequency = sceneConfig.grid.majorUnitFrequency;
     gridMaterial.minorUnitVisibility = sceneConfig.grid.minorUnitVisibility;
     ground.isVisible = sceneConfig.grid.enabled && sceneConfig.ground.enabled;
+    ground.isPickable = ground.isVisible;
     scene.environmentIntensity = sceneConfig.environment.reflections.sceneEnvironmentIntensity;
   });
 }

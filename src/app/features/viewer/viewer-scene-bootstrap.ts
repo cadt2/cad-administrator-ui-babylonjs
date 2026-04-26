@@ -84,8 +84,8 @@ export function createViewerBaseScene(
   new HemisphericLight('mainLight', new Vector3(1, 1, 0), scene);
 
   const ground = MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, scene);
-  ground.isPickable = false;
   ground.isVisible = sceneConfig.grid.enabled && sceneConfig.ground.enabled;
+  ground.isPickable = ground.isVisible;
 
   const gridMaterial = new GridMaterial('gridMaterial', scene);
   gridMaterial.majorUnitFrequency = sceneConfig.grid.majorUnitFrequency;
