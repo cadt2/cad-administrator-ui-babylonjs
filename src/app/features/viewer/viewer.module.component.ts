@@ -1,12 +1,11 @@
 import {
   ArcRotateCamera,
-  Mesh,
   Scene
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
-import { GridMaterial } from '@babylonjs/materials/grid/gridMaterial';
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Layout, Tree } from 'dhx-suite';
+import { createViewerGroundGrid, type ViewerGroundGridFeature } from './viewer-ground-grid';
 import { attachViewerInteractionControls, ViewerInteractionControls } from './viewer-interaction-controls';
 import {
   loadViewerModel,
@@ -301,8 +300,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private engine?: ViewerEngine;
   private scene?: Scene;
   private camera?: ArcRotateCamera;
-  private ground?: Mesh;
-  private gridMaterial?: GridMaterial;
+  private viewerGroundGrid?: ViewerGroundGridFeature;
   private themeObserver?: MutationObserver;
   private resizeObserver?: ResizeObserver;
   private resizeRafId: number | null = null;
@@ -514,16 +512,14 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     const baseScene = createViewerBaseScene(this.engine, canvas, this.sceneConfig);
     this.scene = baseScene.scene;
     this.camera = baseScene.camera;
-    this.ground = baseScene.ground;
-    this.gridMaterial = baseScene.gridMaterial;
+    this.viewerGroundGrid = createViewerGroundGrid(this.scene, this.sceneConfig);
 
     this.applySceneThemeColor();
     this.bindThemeObserver();
 
     const scene = this.scene;
     const camera = baseScene.camera;
-    const ground = baseScene.ground;
-    const gridMaterial = baseScene.gridMaterial;
+    const ground = this.viewerGroundGrid.ground;
 
     this.viewerInteractionControls = attachViewerInteractionControls({
       scene,
@@ -568,8 +564,6 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     loadViewerModel({
       scene,
       camera,
-      ground,
-      gridMaterial,
       sceneConfig: this.sceneConfig,
       modelRootUrl: '/models/',
       modelFileName,
@@ -581,6 +575,9 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       },
       onModelRadiusUpdated: (radius: number) => {
         this.currentModelRadius = radius;
+      },
+      onModelBoundsUpdated: bounds => {
+        this.viewerGroundGrid?.updateFromBounds(bounds);
       }
     });
   }
@@ -612,9 +609,9 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     this.viewerInteractionControls = undefined;
     this.viewerSceneSelection?.dispose();
     this.viewerSceneSelection = undefined;
+    this.viewerGroundGrid?.dispose();
+    this.viewerGroundGrid = undefined;
     this.camera = undefined;
-    this.ground = undefined;
-    this.gridMaterial = undefined;
 
     this.engine?.stopRenderLoop();
     this.scene?.dispose();

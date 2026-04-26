@@ -1,13 +1,11 @@
 import {
   ArcRotateCamera,
-  Mesh,
   Scene,
   SceneLoader,
   type Material,
   type MultiMaterial
 } from '@babylonjs/core';
-import { GridMaterial } from '@babylonjs/materials/grid/gridMaterial';
-import { computeModelBounds, type MeshBoundsLike } from './model-bounds';
+import { computeModelBounds, type MeshBoundsLike, type ModelBounds } from './model-bounds';
 import {
   applyEnvironmentReflectionsToMaterials
 } from './viewer-reflections';
@@ -28,14 +26,13 @@ export interface ViewerModelLoadedEvent {
 export interface ViewerModelLoadOptions {
   scene: Scene;
   camera: ArcRotateCamera;
-  ground: Mesh;
-  gridMaterial: GridMaterial;
   sceneConfig: ViewerSceneConfig;
   modelRootUrl: string;
   modelFileName: string;
   shouldAbort: () => boolean;
   onModelLoaded: (event: ViewerModelLoadedEvent) => void;
   onModelRadiusUpdated: (radius: number) => void;
+  onModelBoundsUpdated?: (bounds: ModelBounds) => void;
 }
 
 function asRenderableMesh(mesh: unknown): RenderableMeshLike | null {
@@ -63,14 +60,13 @@ export function loadViewerModel(options: ViewerModelLoadOptions): void {
   const {
     scene,
     camera,
-    ground,
-    gridMaterial,
     sceneConfig,
     modelRootUrl,
     modelFileName,
     shouldAbort,
     onModelLoaded,
-    onModelRadiusUpdated
+    onModelRadiusUpdated,
+    onModelBoundsUpdated
   } = options;
 
   const assemblyName = modelFileName.replace(/\.[^/.]+$/, '') || 'assembly';
@@ -98,6 +94,7 @@ export function loadViewerModel(options: ViewerModelLoadOptions): void {
     applyEnvironmentReflectionsToMaterials(scene, renderableMeshes, sceneConfig.environment.reflections);
 
     camera.setTarget(bounds.center);
+    onModelBoundsUpdated?.(bounds);
     onModelRadiusUpdated(bounds.radius);
     camera.lowerRadiusLimit = Math.max(bounds.radius * sceneConfig.camera.lowerRadiusFactor, 0.01);
     camera.upperRadiusLimit = bounds.radius * sceneConfig.camera.upperRadiusFactor;
@@ -108,31 +105,6 @@ export function loadViewerModel(options: ViewerModelLoadOptions): void {
     camera.pinchDeltaPercentage = sceneConfig.camera.pinchDeltaPercentage;
 
     scene.skipFrustumClipping = sceneConfig.performance.skipFrustumClipping;
-
-    const groundSize = Math.max(
-      bounds.diagonal * sceneConfig.ground.sizeFromBoundsMultiplier,
-      sceneConfig.ground.minSize
-    );
-    const gridRatio = Math.max(
-      bounds.diagonal / sceneConfig.grid.gridRatioFromBoundsDivisor,
-      sceneConfig.grid.minGridRatio
-    );
-    const groundOffset = Math.max(
-      bounds.radius * sceneConfig.ground.offsetFromRadiusFactor,
-      sceneConfig.ground.minOffset
-    );
-
-    ground.position.x = bounds.center.x;
-    ground.position.z = bounds.center.z;
-    ground.position.y = bounds.min.y - groundOffset;
-    ground.scaling.x = groundSize / 20;
-    ground.scaling.z = groundSize / 20;
-
-    gridMaterial.gridRatio = gridRatio;
-    gridMaterial.majorUnitFrequency = sceneConfig.grid.majorUnitFrequency;
-    gridMaterial.minorUnitVisibility = sceneConfig.grid.minorUnitVisibility;
-    ground.isVisible = sceneConfig.grid.enabled && sceneConfig.ground.enabled;
-    ground.isPickable = ground.isVisible;
     scene.environmentIntensity = sceneConfig.environment.reflections.sceneEnvironmentIntensity;
   });
 }

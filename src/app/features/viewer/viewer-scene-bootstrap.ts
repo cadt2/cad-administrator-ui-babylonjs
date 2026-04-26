@@ -1,15 +1,11 @@
 import {
   ArcRotateCamera,
-  Color3,
   Engine,
   HemisphericLight,
-  Mesh,
-  MeshBuilder,
   Scene,
   Vector3
 } from '@babylonjs/core';
 import { WebGPUEngine } from '@babylonjs/core/Engines/webgpuEngine';
-import { GridMaterial } from '@babylonjs/materials/grid/gridMaterial';
 import {
   initializeReflectionEnvironment
 } from './viewer-reflections';
@@ -28,8 +24,6 @@ export interface ViewerEngineCreationResult {
 export interface ViewerBaseScene {
   scene: Scene;
   camera: ArcRotateCamera;
-  ground: Mesh;
-  gridMaterial: GridMaterial;
 }
 
 export async function createViewerEngine(
@@ -83,32 +77,8 @@ export function createViewerBaseScene(
 
   new HemisphericLight('mainLight', new Vector3(1, 1, 0), scene);
 
-  const ground = MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, scene);
-  ground.isVisible = sceneConfig.grid.enabled && sceneConfig.ground.enabled;
-  ground.isPickable = ground.isVisible;
-
-  const gridMaterial = new GridMaterial('gridMaterial', scene);
-  gridMaterial.majorUnitFrequency = sceneConfig.grid.majorUnitFrequency;
-  gridMaterial.minorUnitVisibility = sceneConfig.grid.minorUnitVisibility;
-  gridMaterial.gridRatio = 1;
-  gridMaterial.backFaceCulling = false;
-  gridMaterial.mainColor = new Color3(
-    sceneConfig.grid.mainColor[0],
-    sceneConfig.grid.mainColor[1],
-    sceneConfig.grid.mainColor[2]
-  );
-  gridMaterial.lineColor = new Color3(
-    sceneConfig.grid.lineColor[0],
-    sceneConfig.grid.lineColor[1],
-    sceneConfig.grid.lineColor[2]
-  );
-  gridMaterial.opacity = sceneConfig.grid.opacity;
-  ground.material = gridMaterial;
-
   return {
     scene,
-    camera,
-    ground,
-    gridMaterial
+    camera
   };
 }
