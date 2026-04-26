@@ -184,6 +184,23 @@ This combination fixes the visual issue during:
 - Manual cell resize
 - Generic layout invalidation cycles
 
+## CAD Selection Bugfix (Ground Blocking Picks)
+
+Issue observed:
+- In some orbit angles, clicking a part failed because the ground/grid was hit first.
+- This behavior is not aligned with CAD expectations, where model selection should work from any view angle.
+
+Root cause:
+- Pointer pick resolution used the first hit, and the ground could intercept the click before model nodes.
+
+Fix applied:
+- Selection flow now prioritizes model-only picking first (`mesh !== ground` and selectable-node filter).
+- Ground picking is evaluated only as a fallback for deselection when no model node is hit.
+
+Result:
+- Parts remain selectable even when the grid is visually in front from the current camera angle.
+- Clicking empty ground still clears the current selection.
+
 ## Config-Driven Shell
 
 UI shell remains config-driven via static JSON files:

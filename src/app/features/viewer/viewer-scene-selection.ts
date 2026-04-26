@@ -274,22 +274,30 @@ export function createViewerSceneSelectionFeature(
       return;
     }
 
-    const pickedMesh = pointerInfo.pickInfo?.pickedMesh as SelectableSceneNodeLike | null | undefined;
-    if (!pickedMesh) {
+    // CAD-like picking policy:
+    // 1) Always try model pick first, even if the grid/ground is in front from the current orbit angle.
+    // 2) Use ground pick only as deselection fallback when no selectable model node is hit.
+    // This prevents the grid from blocking part selection.
+    const modelPick = scene.pick(
+      scene.pointerX,
+      scene.pointerY,
+      mesh => mesh !== ground && nodeMap.has(mesh.uniqueId),
+      false
+    );
+
+    const pickedModelMesh = modelPick?.pickedMesh as SelectableSceneNodeLike | null | undefined;
+    if (pickedModelMesh) {
+      const selectableNode = getSelectableAncestor(pickedModelMesh);
+      if (selectableNode) {
+        selectNodeByUniqueId(selectableNode.uniqueId);
+      }
       return;
     }
 
-    if (pickedMesh === ground) {
+    const groundPick = scene.pick(scene.pointerX, scene.pointerY, mesh => mesh === ground, false);
+    if (groundPick?.hit) {
       clearSelection();
-      return;
     }
-
-    const selectableNode = getSelectableAncestor(pickedMesh);
-    if (!selectableNode) {
-      return;
-    }
-
-    selectNodeByUniqueId(selectableNode.uniqueId);
   });
 
   return {
