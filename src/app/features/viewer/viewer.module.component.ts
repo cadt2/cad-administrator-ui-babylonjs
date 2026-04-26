@@ -309,6 +309,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private viewerInteractionControls?: ViewerInteractionControls;
   private viewerSceneSelection?: ViewerSceneSelectionFeature;
   private currentModelRadius = 1;
+  private currentSelectedTreeNodeId?: string;
   private controlsConfig: ViewerControlsConfig = DEFAULT_VIEWER_CONTROLS_CONFIG;
   private sceneConfig: ViewerSceneConfig = DEFAULT_VIEWER_SCENE_CONFIG;
   private isDestroyed = false;
@@ -382,6 +383,14 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       css: 'parts-tree'
     });
     cell.attach(this.modelBrowserTree);
+
+    this.modelBrowserTree.events.on('itemClick', (id: string) => {
+      // Assembly root nodes are not selectable in the scene — check via DHTMLX data API
+      const item = this.modelBrowserTree?.data?.getItem?.(id) as ModelBrowserTreeNode | undefined;
+      if (item?.data?.isAssemblyRoot) return;
+      // suppressEvent=true: tree is already updated by the click, skip re-selecting in tree
+      this.viewerSceneSelection?.selectByTreeNodeId(id, true);
+    });
   }
 
   private refreshModelBrowserTree(): void {
@@ -542,6 +551,17 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
         overlayColor: this.sceneConfig.selection.overlayColor,
         outlineColor: this.sceneConfig.selection.outlineColor
       },
+      onSelectionChanged: (selection) => {
+        if (!this.modelBrowserTree) return;
+        if (selection) {
+          this.currentSelectedTreeNodeId = selection.treeNodeId;
+          this.modelBrowserTree.selection.add(selection.treeNodeId);
+          this.modelBrowserTree.focusItem(selection.treeNodeId);
+        } else {
+          this.currentSelectedTreeNodeId = undefined;
+          this.modelBrowserTree.selection.remove();
+        }
+      },
       onSelectionRendered: () => this.scene?.render()
     });
 
@@ -609,6 +629,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     this.viewerInteractionControls = undefined;
     this.viewerSceneSelection?.dispose();
     this.viewerSceneSelection = undefined;
+    this.currentSelectedTreeNodeId = undefined;
     this.viewerGroundGrid?.dispose();
     this.viewerGroundGrid = undefined;
     this.camera = undefined;

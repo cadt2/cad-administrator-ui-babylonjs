@@ -51,6 +51,8 @@ export interface ViewerSceneSelectionFeatureConfig {
 export interface ViewerSceneSelectionFeature {
   rebuildSelectableNodes: () => void;
   clearSelection: () => void;
+  /** Select a scene node by its tree node ID (e.g. "node_12345"). Pass suppressEvent=true when triggered from a tree click to avoid re-updating the tree. */
+  selectByTreeNodeId: (treeNodeId: string, suppressEvent?: boolean) => void;
   dispose: () => void;
 }
 
@@ -208,7 +210,7 @@ export function createViewerSceneSelectionFeature(
     return nodeMap.get(node.uniqueId) ?? null;
   };
 
-  const selectNodeByUniqueId = (uniqueId: number): void => {
+  const selectNodeByUniqueId = (uniqueId: number, suppressEvent = false): void => {
     const node = nodeMap.get(uniqueId);
     if (!node) {
       return;
@@ -228,13 +230,22 @@ export function createViewerSceneSelectionFeature(
     }
 
     selectedMeshes = nextSelectedMeshes;
-    onSelectionChanged?.({
-      uniqueId: node.uniqueId,
-      nodeId: node.id,
-      nodeName: node.name || `node_${node.uniqueId}`,
-      treeNodeId: `node_${node.uniqueId}`
-    });
+    if (!suppressEvent) {
+      onSelectionChanged?.({
+        uniqueId: node.uniqueId,
+        nodeId: node.id,
+        nodeName: node.name || `node_${node.uniqueId}`,
+        treeNodeId: `node_${node.uniqueId}`
+      });
+    }
     requestRender();
+  };
+
+  const selectByTreeNodeId = (treeNodeId: string, suppressEvent = false): void => {
+    const numericId = parseInt(treeNodeId.replace(/^node_/, ''), 10);
+    if (!isNaN(numericId) && nodeMap.has(numericId)) {
+      selectNodeByUniqueId(numericId, suppressEvent);
+    }
   };
 
   const rebuildSelectableNodes = (): void => {
@@ -303,6 +314,7 @@ export function createViewerSceneSelectionFeature(
   return {
     rebuildSelectableNodes,
     clearSelection,
+    selectByTreeNodeId,
     dispose: () => {
       clearSelectionVisuals();
       if (pointerObserver) {
