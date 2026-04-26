@@ -63,6 +63,8 @@ npm install
 npm start
 ```
 
+After install, git hooks are configured automatically via `npm run prepare`.
+
 Default URL is usually `http://localhost:4200/`.
 If the port is busy, Angular CLI will prompt for a different port.
 
@@ -81,6 +83,26 @@ npm test
 ```
 
 Note: test runs may fail in this template while working with static/demo JSON auth flows. This is expected for the current static mode and does not block local viewer development.
+
+## Commit Message Policy
+
+This repository enforces conventional commits and English-only commit messages.
+
+Allowed examples:
+- `feat(viewer): add selection outline layer support`
+- `fix(viewer): prioritize model picking over ground`
+- `docs(readme): document CAD selection bugfix`
+
+Checks enforced by hook:
+- Conventional commit format is required.
+- Spanish accented characters are blocked.
+- Common Spanish terms are blocked in commit subjects.
+
+Hook setup command:
+
+```bash
+npm run setup-hooks
+```
 
 ## Known Errors (Current Stage)
 

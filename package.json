@@ -6,7 +6,10 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "setup-hooks": "git config core.hooksPath .githooks",
+    "prepare": "npm run setup-hooks",
+    "validate:commit-msg": "node scripts/validate-commit-message.mjs"
   },
   "private": true,
   "packageManager": "npm@11.12.1",
