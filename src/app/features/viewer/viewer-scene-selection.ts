@@ -44,15 +44,21 @@ export interface ViewerSceneSelectionFeatureConfig {
     overlayColor: RgbTuple;
     outlineColor: RgbTuple;
   };
-  onSelectionChanged?: (selection: ViewerSceneSelectionChange | null) => void;
+  /** Returns true when isolation is active — ground clicks should not deselect. */
+  isIsolationActive?: () => boolean;
+  onSelectionChanged?: (selections: ViewerSceneSelectionChange[]) => void;
   onSelectionRendered?: () => void;
 }
 
 export interface ViewerSceneSelectionFeature {
   rebuildSelectableNodes: () => void;
   clearSelection: () => void;
-  /** Select a scene node by its tree node ID (e.g. "node_12345"). Pass suppressEvent=true when triggered from a tree click to avoid re-updating the tree. */
-  selectByTreeNodeId: (treeNodeId: string, suppressEvent?: boolean) => void;
+  /** Removes selection visuals (overlay + outline) without emitting onSelectionChanged. */
+  clearHighlights: () => void;
+  /** Returns the currently selected renderable meshes (empty if nothing selected). */
+  getSelectedMeshes: () => AbstractMesh[];
+  /** Select a scene node by its tree node ID. suppressEvent skips emitting onSelectionChanged. additive=true adds to current selection (Shift behavior). */
+  selectByTreeNodeId: (treeNodeId: string, suppressEvent?: boolean, additive?: boolean) => void;
   dispose: () => void;
 }
 
@@ -155,7 +161,7 @@ function getEffectiveRootNodes(scene: Scene): SelectableSceneNodeLike[] {
 export function createViewerSceneSelectionFeature(
   config: ViewerSceneSelectionFeatureConfig
 ): ViewerSceneSelectionFeature {
-  const { scene, ground, selectionColors, onSelectionChanged, onSelectionRendered } = config;
+  const { scene, ground, selectionColors, isIsolationActive, onSelectionChanged, onSelectionRendered } = config;
 
   const nodeMap = new Map<number, SelectableSceneNodeLike>();
   const selectionOutlineLayer = new SelectionOutlineLayer('selection-outline', scene, {
@@ -165,6 +171,8 @@ export function createViewerSceneSelectionFeature(
 
   const selectionOverlayColor = Color3.FromArray(selectionColors.overlayColor);
   let effectiveRootIdSet = new Set<number>();
+  // Multi-selection: map of selected nodes by uniqueId
+  const selectedNodes = new Map<number, SelectableSceneNodeLike>();
   let selectedMeshes: SelectableSceneMeshLike[] = [];
 
   const requestRender = (): void => {
@@ -186,8 +194,37 @@ export function createViewerSceneSelectionFeature(
 
   const clearSelection = (): void => {
     clearSelectionVisuals();
-    onSelectionChanged?.(null);
+    selectedNodes.clear();
+    onSelectionChanged?.([]);
     requestRender();
+  };
+
+  const buildSelectionChanges = (): ViewerSceneSelectionChange[] =>
+    Array.from(selectedNodes.values()).map(node => ({
+      uniqueId: node.uniqueId,
+      nodeId: node.id,
+      nodeName: node.name || `node_${node.uniqueId}`,
+      treeNodeId: `node_${node.uniqueId}`
+    }));
+
+  const rebuildSelectionVisuals = (): void => {
+    // Clear visuals then reapply for all selected nodes
+    for (const mesh of selectedMeshes) {
+      if (!mesh.isDisposed?.()) mesh.renderOverlay = false;
+    }
+    selectionOutlineLayer.clearSelection();
+    selectedMeshes = [];
+
+    for (const node of selectedNodes.values()) {
+      const meshes = getRenderableMeshesFromNode(node);
+      for (const mesh of meshes) {
+        mesh.overlayColor = selectionOverlayColor;
+        mesh.overlayAlpha = SELECTION_OVERLAY_ALPHA;
+        mesh.renderOverlay = true;
+      }
+      if (meshes.length > 0) selectionOutlineLayer.addSelection(meshes);
+      selectedMeshes.push(...meshes);
+    }
   };
 
   const getSelectableAncestor = (node: SelectableSceneNodeLike | null | undefined): SelectableSceneNodeLike | null => {
@@ -210,41 +247,37 @@ export function createViewerSceneSelectionFeature(
     return nodeMap.get(node.uniqueId) ?? null;
   };
 
-  const selectNodeByUniqueId = (uniqueId: number, suppressEvent = false): void => {
+  const selectNodeByUniqueId = (uniqueId: number, suppressEvent = false, additive = false): void => {
     const node = nodeMap.get(uniqueId);
     if (!node) {
       return;
     }
 
-    clearSelectionVisuals();
-
-    const nextSelectedMeshes = getRenderableMeshesFromNode(node);
-    if (nextSelectedMeshes.length > 0) {
-      for (const mesh of nextSelectedMeshes) {
-        mesh.overlayColor = selectionOverlayColor;
-        mesh.overlayAlpha = SELECTION_OVERLAY_ALPHA;
-        mesh.renderOverlay = true;
+    if (additive) {
+      // Toggle: if already selected, deselect it
+      if (selectedNodes.has(uniqueId)) {
+        selectedNodes.delete(uniqueId);
+      } else {
+        selectedNodes.set(uniqueId, node);
       }
-
-      selectionOutlineLayer.addSelection(nextSelectedMeshes);
+    } else {
+      // Replace selection
+      selectedNodes.clear();
+      selectedNodes.set(uniqueId, node);
     }
 
-    selectedMeshes = nextSelectedMeshes;
+    rebuildSelectionVisuals();
+
     if (!suppressEvent) {
-      onSelectionChanged?.({
-        uniqueId: node.uniqueId,
-        nodeId: node.id,
-        nodeName: node.name || `node_${node.uniqueId}`,
-        treeNodeId: `node_${node.uniqueId}`
-      });
+      onSelectionChanged?.(buildSelectionChanges());
     }
     requestRender();
   };
 
-  const selectByTreeNodeId = (treeNodeId: string, suppressEvent = false): void => {
+  const selectByTreeNodeId = (treeNodeId: string, suppressEvent = false, additive = false): void => {
     const numericId = parseInt(treeNodeId.replace(/^node_/, ''), 10);
     if (!isNaN(numericId) && nodeMap.has(numericId)) {
-      selectNodeByUniqueId(numericId, suppressEvent);
+      selectNodeByUniqueId(numericId, suppressEvent, additive);
     }
   };
 
@@ -273,6 +306,7 @@ export function createViewerSceneSelectionFeature(
       }
     }
 
+    selectedNodes.clear();
     clearSelectionVisuals();
   };
 
@@ -300,13 +334,14 @@ export function createViewerSceneSelectionFeature(
     if (pickedModelMesh) {
       const selectableNode = getSelectableAncestor(pickedModelMesh);
       if (selectableNode) {
-        selectNodeByUniqueId(selectableNode.uniqueId);
+        const additive = pointerInfo.event instanceof PointerEvent && pointerInfo.event.shiftKey;
+        selectNodeByUniqueId(selectableNode.uniqueId, false, additive);
       }
       return;
     }
 
     const groundPick = scene.pick(scene.pointerX, scene.pointerY, mesh => mesh === ground, false);
-    if (groundPick?.hit) {
+    if (groundPick?.hit && !isIsolationActive?.()) {
       clearSelection();
     }
   });
@@ -314,6 +349,8 @@ export function createViewerSceneSelectionFeature(
   return {
     rebuildSelectableNodes,
     clearSelection,
+    clearHighlights: () => { clearSelectionVisuals(); requestRender(); },
+    getSelectedMeshes: () => selectedMeshes as AbstractMesh[],
     selectByTreeNodeId,
     dispose: () => {
       clearSelectionVisuals();

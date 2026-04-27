@@ -1,4 +1,5 @@
 import {
+  AbstractMesh,
   ArcRotateCamera,
   Scene
 } from '@babylonjs/core';
@@ -6,7 +7,10 @@ import '@babylonjs/loaders/glTF';
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Layout, Tree } from 'dhx-suite';
 import { createViewerGroundGrid, type ViewerGroundGridFeature } from './viewer-ground-grid';
+import { createViewerIsolateSelectionFeature, type ViewerIsolateSelectionFeature } from './viewer-isolate-selection';
+import { createViewerToolbar, type ViewerToolbarFeature } from './viewer-toolbar';
 import { attachViewerInteractionControls, ViewerInteractionControls } from './viewer-interaction-controls';
+import { computeModelBounds, type MeshBoundsLike } from './model-bounds';
 import {
   loadViewerModel,
   type RenderableMeshLike
@@ -308,8 +312,10 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private readonly onLayoutInvalidated = () => this.refreshSceneViewport();
   private viewerInteractionControls?: ViewerInteractionControls;
   private viewerSceneSelection?: ViewerSceneSelectionFeature;
+  private viewerIsolateSelection?: ViewerIsolateSelectionFeature;
+  private viewerToolbar?: ViewerToolbarFeature;
   private currentModelRadius = 1;
-  private currentSelectedTreeNodeId?: string;
+  private currentSelectedTreeNodeIds = new Set<string>();
   private controlsConfig: ViewerControlsConfig = DEFAULT_VIEWER_CONTROLS_CONFIG;
   private sceneConfig: ViewerSceneConfig = DEFAULT_VIEWER_SCENE_CONFIG;
   private isDestroyed = false;
@@ -364,7 +370,30 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
 
     this.bindLayoutRefreshEvents();
     this.mountModelBrowserTree();
+    this.mountViewerToolbar();
     this.mountViewerInMainArea(initToken);
+  }
+
+  private mountViewerToolbar(): void {
+    const cell = this.layout?.getCell('viewer-tools') as
+      | { attach?: (component: unknown) => void }
+      | undefined;
+
+    if (!cell?.attach) {
+      console.error('Viewer tools cell not found in layout');
+      return;
+    }
+
+    this.viewerToolbar?.dispose();
+    this.viewerToolbar = createViewerToolbar({
+      onAction: (id) => {
+        if (id === 'isolate') {
+          const nextActive = this.viewerIsolateSelection?.toggle();
+          this.viewerToolbar?.setIsolateState(!!nextActive);
+        }
+      }
+    });
+    this.viewerToolbar.attach(cell as { attach: (component: unknown) => void });
   }
 
   private mountModelBrowserTree(): void {
@@ -380,16 +409,19 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     this.modelBrowserTree?.destructor();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.modelBrowserTree = new Tree(null as any, {
-      css: 'parts-tree'
-    });
+      css: 'parts-tree',
+      multiselection: true
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
     cell.attach(this.modelBrowserTree);
 
-    this.modelBrowserTree.events.on('itemClick', (id: string) => {
+    this.modelBrowserTree.events.on('itemClick', (id: string, event: MouseEvent) => {
       // Assembly root nodes are not selectable in the scene — check via DHTMLX data API
       const item = this.modelBrowserTree?.data?.getItem?.(id) as ModelBrowserTreeNode | undefined;
       if (item?.data?.isAssemblyRoot) return;
+      const additive = event?.shiftKey ?? false;
       // suppressEvent=true: tree is already updated by the click, skip re-selecting in tree
-      this.viewerSceneSelection?.selectByTreeNodeId(id, true);
+      this.viewerSceneSelection?.selectByTreeNodeId(id, true, additive);
     });
   }
 
@@ -551,18 +583,56 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
         overlayColor: this.sceneConfig.selection.overlayColor,
         outlineColor: this.sceneConfig.selection.outlineColor
       },
-      onSelectionChanged: (selection) => {
+      isIsolationActive: () => this.viewerIsolateSelection?.isActive() ?? false,
+      onSelectionChanged: (selections) => {
         if (!this.modelBrowserTree) return;
-        if (selection) {
-          this.currentSelectedTreeNodeId = selection.treeNodeId;
-          this.modelBrowserTree.selection.add(selection.treeNodeId);
-          this.modelBrowserTree.focusItem(selection.treeNodeId);
-        } else {
-          this.currentSelectedTreeNodeId = undefined;
+
+        if (!selections.length) {
+          // Clear all
+          this.currentSelectedTreeNodeIds.clear();
           this.modelBrowserTree.selection.remove();
+          this.viewerIsolateSelection?.reset();
+          this.viewerToolbar?.setIsolateEnabled(false);
+        } else {
+          // Sync tree: remove deselected, add newly selected
+          const nextIds = new Set(selections.map(s => s.treeNodeId));
+
+          // Remove nodes that are no longer selected
+          for (const prevId of this.currentSelectedTreeNodeIds) {
+            if (!nextIds.has(prevId)) {
+              this.modelBrowserTree.selection.remove(prevId);
+            }
+          }
+          // Add nodes that are newly selected
+          for (const sel of selections) {
+            if (!this.currentSelectedTreeNodeIds.has(sel.treeNodeId)) {
+              this.modelBrowserTree.selection.add(sel.treeNodeId);
+            }
+          }
+          // Focus the last selected item
+          const last = selections[selections.length - 1];
+          this.modelBrowserTree.focusItem(last.treeNodeId);
+
+          this.currentSelectedTreeNodeIds = nextIds;
+          this.viewerToolbar?.setIsolateEnabled(true);
         }
       },
       onSelectionRendered: () => this.scene?.render()
+    });
+
+    this.viewerIsolateSelection = createViewerIsolateSelectionFeature({
+      getAllModelMeshes: () => scene.meshes,
+      getGroundMesh: () => ground,
+      getSelectedMeshes: () => this.viewerSceneSelection?.getSelectedMeshes() ?? [],
+      fitCameraToMeshes: (meshes) => this.fitCameraToMeshes(meshes),
+      onIsolationChanged: (active) => {
+        this.viewerToolbar?.setIsolateState(active);
+        if (active) {
+          // Remove selection highlights once isolation is active — selection purpose is fulfilled
+          this.viewerSceneSelection?.clearHighlights();
+        }
+      },
+      onRequestRender: () => this.scene?.render()
     });
 
     this.engine.runRenderLoop(() => {
@@ -589,6 +659,8 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       modelFileName,
       shouldAbort: () => this.isDestroyed || this.viewerInitToken !== initToken || scene !== this.scene,
       onModelLoaded: (event: { assemblyName: string; renderableMeshes: RenderableMeshLike[] }) => {
+        this.viewerIsolateSelection?.reset();
+        this.viewerToolbar?.setIsolateEnabled(false);
         this.modelBrowserTreeData = buildModelBrowserTreeData(scene, event.assemblyName);
         this.refreshModelBrowserTree();
         this.viewerSceneSelection?.rebuildSelectableNodes();
@@ -614,6 +686,21 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     this.resizeObserver.observe(container);
   }
 
+  private fitCameraToMeshes(meshes: AbstractMesh[]): void {
+    if (!this.camera || !meshes.length) return;
+    const bounds = computeModelBounds(meshes as unknown as MeshBoundsLike[], { refreshBounds: true });
+    if (!bounds) return;
+    const camera = this.camera;
+    const sc = this.sceneConfig;
+    camera.setTarget(bounds.center);
+    camera.lowerRadiusLimit = Math.max(bounds.radius * sc.camera.lowerRadiusFactor, 0.01);
+    camera.upperRadiusLimit = bounds.radius * sc.camera.upperRadiusFactor;
+    camera.radius = Math.max(bounds.radius * 2.2, camera.lowerRadiusLimit + 0.1);
+    camera.minZ = Math.max(bounds.radius * sc.camera.minZFactor, 0.001);
+    camera.maxZ = bounds.radius * sc.camera.maxZFactor;
+    this.scene?.render();
+  }
+
   private disposeViewerResources(): void {
     window.removeEventListener('resize', this.onResize);
     this.themeObserver?.disconnect();
@@ -627,9 +714,11 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
 
     this.viewerInteractionControls?.dispose();
     this.viewerInteractionControls = undefined;
+    this.viewerIsolateSelection?.dispose();
+    this.viewerIsolateSelection = undefined;
     this.viewerSceneSelection?.dispose();
     this.viewerSceneSelection = undefined;
-    this.currentSelectedTreeNodeId = undefined;
+    this.currentSelectedTreeNodeIds.clear();
     this.viewerGroundGrid?.dispose();
     this.viewerGroundGrid = undefined;
     this.camera = undefined;
@@ -642,6 +731,8 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   }
 
   private disposeLayoutResources(): void {
+    this.viewerToolbar?.dispose();
+    this.viewerToolbar = undefined;
     this.modelBrowserTree?.destructor();
     this.modelBrowserTree = undefined;
     this.layout?.destructor();
