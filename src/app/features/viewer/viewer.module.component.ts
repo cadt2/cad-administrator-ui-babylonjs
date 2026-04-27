@@ -507,8 +507,10 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       // Tree is locked while isolation is active — prevent selection changes
       if (this.viewerIsolateSelection?.isActive()) return;
       const additive = event?.shiftKey ?? false;
-      // suppressEvent=true: tree is already updated by the click, skip re-selecting in tree
+      // suppressEvent=true: tree is already updated by the click, skip re-selecting in tree.
+      // onSelectionChanged is suppressed so we enable isolate action here directly.
       this.viewerSceneSelection?.selectByTreeNodeId(id, true, additive);
+      this.setIsolateActionEnabled(true);
     });
   }
 
