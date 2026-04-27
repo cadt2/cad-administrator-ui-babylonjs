@@ -5,7 +5,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
-import { Layout, Tree } from 'dhx-suite';
+import { ContextMenu, Layout, Tree } from 'dhx-suite';
 import { createViewerGroundGrid, type ViewerGroundGridFeature } from './viewer-ground-grid';
 import { createViewerIsolateSelectionFeature, type ViewerIsolateSelectionFeature } from './viewer-isolate-selection';
 import { createViewerToolbar, type ViewerToolbarFeature } from './viewer-toolbar';
@@ -292,6 +292,13 @@ function parseViewerControlsConfig(input: unknown): ViewerControlsConfig {
     :host ::ng-deep .parts-tree .dhx_tree-list-item__content {
       gap: 4px;
     }
+
+    /* Model browser locked state during isolation */
+    .viewer-layout-host.viewer--isolation-active ::ng-deep .dhx_cell[data-dhx-item="model-browser"] {
+      opacity: 0.45;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -314,6 +321,9 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private viewerSceneSelection?: ViewerSceneSelectionFeature;
   private viewerIsolateSelection?: ViewerIsolateSelectionFeature;
   private viewerToolbar?: ViewerToolbarFeature;
+  private viewerContextMenu?: ContextMenu;
+  private canvasContextMenuHandler?: (event: MouseEvent) => void;
+  private contextMenuCanvas?: HTMLCanvasElement;
   private currentModelRadius = 1;
   private currentSelectedTreeNodeIds = new Set<string>();
   private controlsConfig: ViewerControlsConfig = DEFAULT_VIEWER_CONTROLS_CONFIG;
@@ -390,10 +400,85 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
         if (id === 'isolate') {
           const nextActive = this.viewerIsolateSelection?.toggle();
           this.viewerToolbar?.setIsolateState(!!nextActive);
+          return;
+        }
+
+        if (id === 'fit-view') {
+          this.fitView();
         }
       }
     });
     this.viewerToolbar.attach(cell as { attach: (component: unknown) => void });
+  }
+
+  private mountViewerContextMenu(canvas: HTMLCanvasElement): void {
+    this.disposeViewerContextMenu();
+
+    this.viewerContextMenu = new ContextMenu(undefined, {
+      css: 'viewer-context-menu',
+      data: [
+        {
+          id: 'isolate',
+          type: 'menuItem',
+          icon: 'mdi mdi-cube-outline',
+          value: 'Isolate Selection'
+        },
+        {
+          type: 'separator'
+        },
+        {
+          id: 'fit-view',
+          type: 'menuItem',
+          icon: 'mdi mdi-fit-to-screen-outline',
+          value: 'Fit View'
+        }
+      ]
+    });
+
+    this.viewerContextMenu.events.on('click', (id: string | number) => {
+      const actionId = String(id);
+      if (actionId === 'isolate') {
+        const nextActive = this.viewerIsolateSelection?.toggle();
+        this.viewerToolbar?.setIsolateState(!!nextActive);
+        return;
+      }
+
+      if (actionId === 'fit-view') {
+        this.fitView();
+      }
+    });
+
+    this.viewerContextMenu.disable('isolate');
+
+    this.canvasContextMenuHandler = (event: MouseEvent) => {
+      event.preventDefault();
+      this.viewerContextMenu?.showAt(event);
+    };
+    this.contextMenuCanvas = canvas;
+    canvas.addEventListener('contextmenu', this.canvasContextMenuHandler);
+  }
+
+  private disposeViewerContextMenu(): void {
+    if (this.contextMenuCanvas && this.canvasContextMenuHandler) {
+      this.contextMenuCanvas.removeEventListener('contextmenu', this.canvasContextMenuHandler);
+    }
+    this.canvasContextMenuHandler = undefined;
+    this.contextMenuCanvas = undefined;
+    this.viewerContextMenu?.destructor();
+    this.viewerContextMenu = undefined;
+  }
+
+  private setIsolateActionEnabled(enabled: boolean): void {
+    this.viewerToolbar?.setIsolateEnabled(enabled);
+    if (!this.viewerContextMenu) {
+      return;
+    }
+
+    if (enabled) {
+      this.viewerContextMenu.enable('isolate');
+    } else {
+      this.viewerContextMenu.disable('isolate');
+    }
   }
 
   private mountModelBrowserTree(): void {
@@ -419,6 +504,8 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       // Assembly root nodes are not selectable in the scene — check via DHTMLX data API
       const item = this.modelBrowserTree?.data?.getItem?.(id) as ModelBrowserTreeNode | undefined;
       if (item?.data?.isAssemblyRoot) return;
+      // Tree is locked while isolation is active — prevent selection changes
+      if (this.viewerIsolateSelection?.isActive()) return;
       const additive = event?.shiftKey ?? false;
       // suppressEvent=true: tree is already updated by the click, skip re-selecting in tree
       this.viewerSceneSelection?.selectByTreeNodeId(id, true, additive);
@@ -543,6 +630,8 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     canvas.style.touchAction = 'none';
     container.appendChild(canvas);
 
+    this.mountViewerContextMenu(canvas);
+
     const engineResult = await createViewerEngine(canvas, this.sceneConfig);
     if (this.isDestroyed || this.viewerInitToken !== initToken) {
       engineResult.engine.dispose();
@@ -592,7 +681,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
           this.currentSelectedTreeNodeIds.clear();
           this.modelBrowserTree.selection.remove();
           this.viewerIsolateSelection?.reset();
-          this.viewerToolbar?.setIsolateEnabled(false);
+          this.setIsolateActionEnabled(false);
         } else {
           // Sync tree: remove deselected, add newly selected
           const nextIds = new Set(selections.map(s => s.treeNodeId));
@@ -614,7 +703,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
           this.modelBrowserTree.focusItem(last.treeNodeId);
 
           this.currentSelectedTreeNodeIds = nextIds;
-          this.viewerToolbar?.setIsolateEnabled(true);
+          this.setIsolateActionEnabled(true);
         }
       },
       onSelectionRendered: () => this.scene?.render()
@@ -624,12 +713,14 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       getAllModelMeshes: () => scene.meshes,
       getGroundMesh: () => ground,
       getSelectedMeshes: () => this.viewerSceneSelection?.getSelectedMeshes() ?? [],
-      fitCameraToMeshes: (meshes) => this.fitCameraToMeshes(meshes),
       onIsolationChanged: (active) => {
         this.viewerToolbar?.setIsolateState(active);
         if (active) {
           // Remove selection highlights once isolation is active — selection purpose is fulfilled
           this.viewerSceneSelection?.clearHighlights();
+          this.layoutHost.nativeElement.classList.add('viewer--isolation-active');
+        } else {
+          this.layoutHost.nativeElement.classList.remove('viewer--isolation-active');
         }
       },
       onRequestRender: () => this.scene?.render()
@@ -660,7 +751,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       shouldAbort: () => this.isDestroyed || this.viewerInitToken !== initToken || scene !== this.scene,
       onModelLoaded: (event: { assemblyName: string; renderableMeshes: RenderableMeshLike[] }) => {
         this.viewerIsolateSelection?.reset();
-        this.viewerToolbar?.setIsolateEnabled(false);
+        this.setIsolateActionEnabled(false);
         this.modelBrowserTreeData = buildModelBrowserTreeData(scene, event.assemblyName);
         this.refreshModelBrowserTree();
         this.viewerSceneSelection?.rebuildSelectableNodes();
@@ -701,6 +792,22 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     this.scene?.render();
   }
 
+  private getFitViewMeshes(): AbstractMesh[] {
+    if (!this.scene) return [];
+
+    const ground = this.viewerGroundGrid?.ground;
+    const allModelMeshes = this.scene.meshes.filter(mesh => !mesh.isDisposed?.() && mesh !== ground);
+    const visibleModelMeshes = allModelMeshes.filter(mesh => mesh.isVisible);
+
+    // Prefer framing visible context (isolation mode), fallback to full model if all are hidden.
+    return visibleModelMeshes.length ? visibleModelMeshes : allModelMeshes;
+  }
+
+  private fitView(): void {
+    const meshes = this.getFitViewMeshes();
+    this.fitCameraToMeshes(meshes);
+  }
+
   private disposeViewerResources(): void {
     window.removeEventListener('resize', this.onResize);
     this.themeObserver?.disconnect();
@@ -714,6 +821,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
 
     this.viewerInteractionControls?.dispose();
     this.viewerInteractionControls = undefined;
+    this.disposeViewerContextMenu();
     this.viewerIsolateSelection?.dispose();
     this.viewerIsolateSelection = undefined;
     this.viewerSceneSelection?.dispose();

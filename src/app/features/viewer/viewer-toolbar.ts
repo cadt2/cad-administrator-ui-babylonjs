@@ -2,7 +2,7 @@ import { Toolbar } from 'dhx-suite';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ViewerToolbarActionId = 'isolate';
+export type ViewerToolbarActionId = 'isolate' | 'fit-view';
 
 export interface ViewerToolbarConfig {
   onAction: (id: ViewerToolbarActionId) => void;
@@ -40,7 +40,19 @@ export function createViewerToolbar(config: ViewerToolbarConfig): ViewerToolbarF
   const toolbar = new Toolbar(null as unknown as HTMLElement, {
     css: 'viewer-toolbar',
     data: [
-      buildIsolateButtonData(false)
+      buildIsolateButtonData(false),
+      {
+        type: 'separator'
+      },
+      {
+        id: 'fit-view',
+        type: 'button',
+        icon: 'mdi mdi-fit-to-screen-outline',
+        tooltip: 'Fit View',
+        view: 'link',
+        size: 'medium',
+        css: 'viewer-toolbar-btn'
+      }
     ]
   });
 
@@ -48,8 +60,9 @@ export function createViewerToolbar(config: ViewerToolbarConfig): ViewerToolbarF
   toolbar.disable('isolate');
 
   toolbar.events.on('click', (id: string | number) => {
-    if (String(id) === 'isolate') {
-      onAction('isolate');
+    const actionId = String(id);
+    if (actionId === 'isolate' || actionId === 'fit-view') {
+      onAction(actionId as ViewerToolbarActionId);
     }
   });
 

@@ -6,8 +6,6 @@ export interface ViewerIsolateSelectionConfig {
   getAllModelMeshes: () => AbstractMesh[];
   getGroundMesh: () => AbstractMesh;
   getSelectedMeshes: () => AbstractMesh[];
-  /** Called to fit camera to a set of meshes (isolated subset or full assembly). */
-  fitCameraToMeshes: (meshes: AbstractMesh[]) => void;
   onIsolationChanged?: (active: boolean) => void;
   onRequestRender?: () => void;
 }
@@ -27,7 +25,7 @@ export interface ViewerIsolateSelectionFeature {
 export function createViewerIsolateSelectionFeature(
   config: ViewerIsolateSelectionConfig
 ): ViewerIsolateSelectionFeature {
-  const { getAllModelMeshes, getGroundMesh, getSelectedMeshes, fitCameraToMeshes, onIsolationChanged, onRequestRender } = config;
+  const { getAllModelMeshes, getGroundMesh, getSelectedMeshes, onIsolationChanged, onRequestRender } = config;
 
   let isolationActive = false;
   // Stores original isVisible state before isolation is applied
@@ -83,11 +81,10 @@ export function createViewerIsolateSelectionFeature(
 
   const toggle = (): boolean => {
     if (isolationActive) {
-      // Exit isolation — restore all meshes and fit camera to full assembly
+      // Exit isolation — restore all meshes
       restoreAll();
       isolationActive = false;
       onIsolationChanged?.(false);
-      fitCameraToMeshes(getAllModelMeshes().filter(m => !m.isDisposed?.()));
       requestRender();
       return false;
     }
@@ -101,8 +98,6 @@ export function createViewerIsolateSelectionFeature(
     applyIsolation(selectedMeshes);
     isolationActive = true;
     onIsolationChanged?.(true);
-    // CAD behavior: frame the isolated subset after entering isolation
-    fitCameraToMeshes(selectedMeshes);
     requestRender();
     return true;
   };
