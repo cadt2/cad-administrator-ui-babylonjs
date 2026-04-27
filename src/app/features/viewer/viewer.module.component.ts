@@ -20,6 +20,10 @@ import {
   type ViewerSceneSelectionFeature
 } from './viewer-scene-selection';
 import {
+  createViewerMarqueeSelectionFeature,
+  type ViewerMarqueeSelectionFeature
+} from './viewer-marquee-selection';
+import {
   createViewerBaseScene,
   createViewerEngine,
   type ViewerEngine
@@ -321,6 +325,7 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
   private viewerSceneSelection?: ViewerSceneSelectionFeature;
   private viewerIsolateSelection?: ViewerIsolateSelectionFeature;
   private viewerToolbar?: ViewerToolbarFeature;
+    private viewerMarqueeSelection?: ViewerMarqueeSelectionFeature;
   private viewerContextMenu?: ContextMenu;
   private canvasContextMenuHandler?: (event: MouseEvent) => void;
   private contextMenuCanvas?: HTMLCanvasElement;
@@ -711,6 +716,23 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
       onSelectionRendered: () => this.scene?.render()
     });
 
+    this.viewerMarqueeSelection = createViewerMarqueeSelectionFeature({
+      scene,
+      canvas,
+      isIsolationActive: () => this.viewerIsolateSelection?.isActive() ?? false,
+      getSelectableNodes: () => {
+        const all = this.viewerSceneSelection?.getAllSelectableNodes() ?? [];
+        if (this.viewerIsolateSelection?.isActive()) {
+          return all.filter(({ meshes }) => meshes.some(m => m.isVisible));
+        }
+        return all;
+      },
+      onSuppressNextPick: () => this.viewerSceneSelection?.suppressNextPick(),
+      onMarqueeSelection: (uniqueIds, additive) => {
+        this.viewerSceneSelection?.selectMultiple(uniqueIds, additive);
+      }
+    });
+
     this.viewerIsolateSelection = createViewerIsolateSelectionFeature({
       getAllModelMeshes: () => scene.meshes,
       getGroundMesh: () => ground,
@@ -828,6 +850,8 @@ export class ViewerModuleComponent implements AfterViewInit, OnDestroy {
     this.viewerIsolateSelection = undefined;
     this.viewerSceneSelection?.dispose();
     this.viewerSceneSelection = undefined;
+      this.viewerMarqueeSelection?.dispose();
+      this.viewerMarqueeSelection = undefined;
     this.currentSelectedTreeNodeIds.clear();
     this.viewerGroundGrid?.dispose();
     this.viewerGroundGrid = undefined;

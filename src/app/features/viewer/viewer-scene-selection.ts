@@ -59,6 +59,12 @@ export interface ViewerSceneSelectionFeature {
   getSelectedMeshes: () => AbstractMesh[];
   /** Select a scene node by its tree node ID. suppressEvent skips emitting onSelectionChanged. additive=true adds to current selection (Shift behavior). */
   selectByTreeNodeId: (treeNodeId: string, suppressEvent?: boolean, additive?: boolean) => void;
+  /** Returns all effective-root selectable nodes with their renderable leaf meshes. */
+  getAllSelectableNodes: () => Array<{ nodeUniqueId: number; meshes: AbstractMesh[] }>;
+  /** Select multiple nodes by uniqueId, replacing or adding to current selection. */
+  selectMultiple: (uniqueIds: number[], additive?: boolean) => void;
+  /** Suppresses the next POINTERPICK event (used by marquee selection to prevent double-fire). */
+  suppressNextPick: () => void;
   dispose: () => void;
 }
 
@@ -164,6 +170,8 @@ export function createViewerSceneSelectionFeature(
   const { scene, ground, selectionColors, isIsolationActive, onSelectionChanged, onSelectionRendered } = config;
 
   const nodeMap = new Map<number, SelectableSceneNodeLike>();
+  let suppressPickCount = 0;
+
   const selectionOutlineLayer = new SelectionOutlineLayer('selection-outline', scene, {
     mainTextureRatio: 1.0
   });
@@ -196,6 +204,28 @@ export function createViewerSceneSelectionFeature(
     clearSelectionVisuals();
     selectedNodes.clear();
     onSelectionChanged?.([]);
+    requestRender();
+  };
+
+  const getAllSelectableNodes = (): Array<{ nodeUniqueId: number; meshes: AbstractMesh[] }> => {
+    const result: Array<{ nodeUniqueId: number; meshes: AbstractMesh[] }> = [];
+    for (const uniqueId of effectiveRootIdSet) {
+      const node = nodeMap.get(uniqueId);
+      if (!node) continue;
+      const meshes = getRenderableMeshesFromNode(node) as AbstractMesh[];
+      if (meshes.length > 0) result.push({ nodeUniqueId: uniqueId, meshes });
+    }
+    return result;
+  };
+
+  const selectMultiple = (uniqueIds: number[], additive = false): void => {
+    if (!additive) selectedNodes.clear();
+    for (const id of uniqueIds) {
+      const node = nodeMap.get(id);
+      if (node) selectedNodes.set(id, node);
+    }
+    rebuildSelectionVisuals();
+    onSelectionChanged?.(buildSelectionChanges());
     requestRender();
   };
 
@@ -319,6 +349,13 @@ export function createViewerSceneSelectionFeature(
       return;
     }
 
+    // Marquee selection may suppress the next pick to avoid double-fire
+    if (suppressPickCount > 0) {
+      suppressPickCount--;
+      return;
+    }
+
+
     // CAD-like picking policy:
     // 1) Always try model pick first, even if the grid/ground is in front from the current orbit angle.
     // 2) Use ground pick only as deselection fallback when no selectable model node is hit.
@@ -352,6 +389,9 @@ export function createViewerSceneSelectionFeature(
     clearHighlights: () => { clearSelectionVisuals(); requestRender(); },
     getSelectedMeshes: () => selectedMeshes as AbstractMesh[],
     selectByTreeNodeId,
+    getAllSelectableNodes,
+    selectMultiple,
+    suppressNextPick: () => { suppressPickCount++; },
     dispose: () => {
       clearSelectionVisuals();
       if (pointerObserver) {
