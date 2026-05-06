@@ -4,7 +4,7 @@
     "type": "customHTML",
     "id": "user-profile",
     "css": "user-info-item",
-    "html": "<div class='user-info-container'><img class='user-info-avatar' src='/imgs/HEADSHOTS-MINI.jpg' alt='Leo Gomez'/><div class='user-info-title'>Leo Gomez</div><div class='user-info-contact'>@cadt2</div></div>"
+    "html": "<div class='user-info-container'><div class='user-info-contact'>@cadt2</div></div>"
   },
   { "type": "separator" },
   { "id": "env-3d-viewer", "value": "3D VIEWER", "icon": "mdi mdi-cube-outline" },
