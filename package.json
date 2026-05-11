@@ -1,12 +1,15 @@
 {
   "name": "dhtmlx-suite-angular",
   "version": "0.3.0",
+  "license": "GPL-2.0-only",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
+    "licenses:check": "npm run licenses:generate && git diff --exit-code -- THIRD_PARTY_LICENSES.md",
     "setup-hooks": "git config core.hooksPath .githooks",
     "prepare": "npm run setup-hooks",
     "validate:commit-msg": "node scripts/validate-commit-message.mjs"

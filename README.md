@@ -56,6 +56,18 @@ Not implemented yet (planned):
 - BabylonJS 9.x (`@babylonjs/core`, `@babylonjs/loaders`, `@babylonjs/materials`)
 - TypeScript 5.9.x
 
+## License and Compliance
+
+This repository is licensed under GNU GPL v2.0.
+
+Copyright (C) 2026 CAD Administrator UI contributors.
+
+- Project license: see `LICENSE`.
+- Third-party dependency license inventory: see `THIRD_PARTY_LICENSES.md`.
+- This project includes DHTMLX Suite (`dhx-suite`) from npm under GPL-2.0 terms.
+
+For this open educational project, GPL use is aligned with the project direction. If this repository is ever moved to a closed/proprietary model, replace the GPL dependency or acquire a commercial license from the vendor before distribution.
+
 ## Run Locally
 
 ```bash
